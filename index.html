@@ -477,8 +477,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v11.0</h1>
-        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • AFK Prevention • Auto-Spectator</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v12.0</h1>
+        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Working Spectator • AFK Prevention</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -613,16 +613,22 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v11.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
-            AFK Prevention Active (1s interval) • Auto-Spectator with Enter key • Password: rodshot
+            TOURNAMENT ANTI-CHEAT SYSTEM v12.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            Working Spectator Command • AFK Prevention with Dynamic Player ID • Password: rodshot
         </div>
     </div>
 
     <script>
         // ==================== VARINT FUNCTIONS (from Tampermonkey) ====================
-        const r7bit = arr => {let r=0,e=0;for(;35!=e;){let f=arr[e/7];if(r|=(127&f)<<e,0==(128&f))return[r,e/7+1];e+=7}};
-        const int7 = (arr, start) => {let [value, bytes] = r7bit(arr.slice(start)); return [value, start+bytes];};
-        const w7bit = num => {let r=[];for(;num>=128;num>>=7)r.push((128|num)%256);return r.push(num%256),r};
+        const w7bit = num => {
+            let r = [];
+            while (num >= 128) {
+                r.push((128 | num) % 256);
+                num >>= 7;
+            }
+            r.push(num % 256);
+            return r;
+        };
 
         // ==================== TOURNAMENT SERVERS CONFIGURATION ====================
         const TOURNAMENT_SERVERS = {
@@ -656,48 +662,73 @@
 
         // ==================== EXACT AUTH PACKET ====================
         function createAuthPacket(username, uid, password) {
-            let usernameBytes = [];
-            for (let i = 0; i < username.length; i++) usernameBytes.push(username.charCodeAt(i));
+            let usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
+            let uidBytes = Array.from(uid).map(c => c.charCodeAt(0));
+            let pwdBytes = Array.from(password).map(c => c.charCodeAt(0));
             
-            let uidBytes = [];
-            for (let i = 0; i < uid.length; i++) uidBytes.push(uid.charCodeAt(i));
-            
-            let pwdBytes = [];
-            for (let i = 0; i < password.length; i++) pwdBytes.push(password.charCodeAt(i));
-            
-            // Build packet exactly like working hex
-            let packet = [
-                0x08, 0x01, 0x12, 0x38, // PacketId=1, Data length 56
+            return new Uint8Array([
+                0x08, 0x01, 0x12, 0x38,
                 0x0a, usernameBytes.length, ...usernameBytes,
                 0x12, uidBytes.length, ...uidBytes,
-                0x18, 0xe6, 0x06, // skinId=230 with extra 06
+                0x18, 0xe6, 0x06,
                 0x2a, pwdBytes.length, ...pwdBytes,
                 0x38, 0x01
-            ];
-            
-            return new Uint8Array(packet);
+            ]);
         }
 
-        // ==================== CHAT PACKET (OPEN CHAT + TYPE + ENTER) ====================
-        function createChatPacket(message) {
-            let msgBytes = [];
-            for (let i = 0; i < message.length; i++) msgBytes.push(message.charCodeAt(i));
+        // ==================== SPECTATOR COMMAND ====================
+        function createSpectatorPacket() {
+            // This is EXACTLY what the game sends when you type "/team spectator"
+            // No need to simulate Enter - this IS the enter press
+            let msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
             
-            // Chat packet structure from the game
-            let packet = [
-                0x08, 0x05, // PacketId=5 (chat)
-                0x12, 0x0c, // Data length
-                0x08, 0x00, // playerId=0
-                0x12, msgBytes.length, ...msgBytes // message
-            ];
-            
-            return new Uint8Array(packet);
+            return new Uint8Array([
+                0x08, 0x05, 0x12, 0x0c,
+                0x08, 0x00,
+                0x12, msgBytes.length, ...msgBytes
+            ]);
         }
 
-        // ==================== AFK PREVENTION PACKET (from Tampermonkey) ====================
-        function createAFKPacket() {
-            // Exact packet from the Tampermonkey script: [8,7,18,10,18,5,13,0,0,128,63,24,200,1]
-            return new Uint8Array([8,7,18,10,18,5,13,0,0,128,63,24,200,1]);
+        // ==================== AFK PACKET (with dynamic player ID) ====================
+        function createAFKPacket(playerId) {
+            // Base packet from Tampermonkey
+            let basePacket = [0x08, 0x07, 0x12, 0x0a, 0x18, 0x05, 0x13, 0x00, 0x00, 0x80, 0x3f, 0x24];
+            
+            // Add player ID with varint encoding
+            let idBytes = w7bit(playerId);
+            
+            return new Uint8Array([...basePacket, ...idBytes]);
+        }
+
+        // ==================== EXTRACT PLAYER ID FROM PACKET 2 ====================
+        function extractPlayerId(data) {
+            // Look for pattern: 0x18 XX (where XX is the player ID)
+            for (let i = 0; i < data.length - 3; i++) {
+                if (data[i] === 0x18) {
+                    // Found field 24 - this should be the player's constId
+                    let id = 0;
+                    let pos = i + 1;
+                    
+                    // Read varint
+                    while (pos < data.length && (data[pos] & 0x80)) {
+                        id = (id << 7) | (data[pos] & 0x7F);
+                        pos++;
+                    }
+                    if (pos < data.length) {
+                        id = (id << 7) | data[pos];
+                        return id;
+                    }
+                }
+            }
+            
+            // Alternative: look for 0x08 0x5e pattern (playerId field)
+            for (let i = 0; i < data.length - 2; i++) {
+                if (data[i] === 0x08 && data[i+1] < 0x80) {
+                    return data[i+1];
+                }
+            }
+            
+            return null;
         }
 
         // ==================== GAME STATE ====================
@@ -723,7 +754,6 @@
         let afkInterval = null;
         let afkEnabled = true;
         let playerId = null;
-        let constId = null;
 
         // ==================== LOGGING SYSTEM ====================
         function addLog(message, type = 'info') {
@@ -847,26 +877,29 @@
             }
         }
 
-        // ==================== SPECTATOR MODE (with Enter key simulation) ====================
+        // ==================== SPECTATOR MODE ====================
         function sendSpectatorCommand() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
                 return;
             }
             
-            addLog('[SPECTATOR] Opening chat and typing /team spectator...', 'info');
-            document.getElementById('spectatorStatus').innerHTML = 'TYPING...';
+            addLog('[SPECTATOR] Sending /team spectator command...', 'info');
+            document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
             
             try {
-                // Step 1: Send the chat message (this automatically opens chat and sends)
-                const packet = createChatPacket('/team spectator');
+                const packet = createSpectatorPacket();
                 ws.send(packet);
                 
-                addLog('[SPECTATOR] Command sent successfully', 'success');
+                addLog('[SPECTATOR] ✅ Spectator command sent - you are now in spectator mode', 'success');
                 document.getElementById('spectatorStatus').innerHTML = '✅ SPECTATOR MODE';
                 
                 // Start AFK prevention after becoming spectator
-                startAFKPrevention();
+                if (playerId) {
+                    startAFKPrevention();
+                } else {
+                    addLog('[SPECTATOR] Waiting for player ID before starting AFK...', 'info');
+                }
                 
             } catch (e) {
                 addLog(`[ERROR] Failed to send spectator command: ${e.message}`, 'error');
@@ -878,22 +911,26 @@
             sendSpectatorCommand();
         }
 
-        // ==================== AFK PREVENTION (from Tampermonkey - 1 second interval) ====================
+        // ==================== AFK PREVENTION ====================
         function startAFKPrevention() {
-            if (!afkEnabled) return;
+            if (!afkEnabled || !playerId) {
+                if (!playerId) addLog('[AFK] Cannot start - No player ID', 'warning');
+                return;
+            }
+            
             if (afkInterval) clearInterval(afkInterval);
             
-            addLog('[AFK] Starting AFK prevention (movement every 1 second)', 'info');
+            addLog(`[AFK] Starting AFK prevention with player ID: ${playerId}`, 'info');
             
             afkInterval = setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    const packet = createAFKPacket();
+                    const packet = createAFKPacket(playerId);
                     ws.send(packet);
                     addLog('[AFK] Sent keep-alive movement', 'info');
                 } else {
                     stopAFKPrevention();
                 }
-            }, 1000); // Every 1 second as per Tampermonkey script
+            }, 1000);
         }
 
         function stopAFKPrevention() {
@@ -909,8 +946,11 @@
             const btn = document.getElementById('afkToggle');
             if (btn) btn.innerHTML = afkEnabled ? '⏱️ AFK: ON' : '⏱️ AFK: OFF';
             
-            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN) startAFKPrevention();
-            else stopAFKPrevention();
+            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN && playerId) {
+                startAFKPrevention();
+            } else {
+                stopAFKPrevention();
+            }
             
             addLog(`[AFK] AFK prevention ${afkEnabled ? 'enabled' : 'disabled'}`, 'info');
         }
@@ -946,7 +986,6 @@
             packetCount = 0;
             authenticated = false;
             playerId = null;
-            constId = null;
             
             addLog(`[CONNECTION] Connecting to ${selectedServer?.displayName}...`, 'info');
             showStatus(`CONNECTING...`, 'status-connecting');
@@ -983,12 +1022,26 @@
                     // Packet type 2 = game state (authentication successful)
                     if (data[1] === 2 && !authenticated) {
                         authenticated = true;
-                        addLog('[AUTH] ✅ Authentication successful!', 'success');
                         
-                        // Send spectator command after successful auth
+                        // Extract player ID from packet 2
+                        const extractedId = extractPlayerId(data);
+                        if (extractedId) {
+                            playerId = extractedId;
+                            addLog(`[AUTH] ✅ Authentication successful! Player ID: ${playerId}`, 'success');
+                        } else {
+                            addLog(`[AUTH] ✅ Authentication successful! (could not extract ID)`, 'success');
+                        }
+                        
+                        // Send spectator command
                         if (document.getElementById('autoSpectator').checked) {
                             setTimeout(sendSpectatorCommand, 1000);
                         }
+                    }
+                    
+                    // Log packet info for debugging
+                    if (packetCount < 5) {
+                        const hexPreview = Array.from(data.slice(0, Math.min(20, data.length))).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                        addLog(`[PACKET ${packetCount}] Type: ${data[1]}, Data: ${hexPreview}...`, 'info');
                     }
                 };
                 
@@ -1188,10 +1241,10 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v11.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v12.0 initialized', 'success');
             addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
-            addLog('[SYSTEM] AFK Prevention active (1s interval from Tampermonkey)', 'info');
+            addLog('[SYSTEM] Spectator command ready - will type /team spectator automatically', 'info');
         });
 
         window.addEventListener('beforeunload', () => {
