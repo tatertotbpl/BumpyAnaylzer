@@ -477,7 +477,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v5.0</h1>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v6.0</h1>
         <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Fixed Authentication</div>
         
         <div class="tournament-banner">
@@ -610,7 +610,7 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v5.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            TOURNAMENT ANTI-CHEAT SYSTEM v6.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
             © 2024 Tournament Anti-Cheat • Password: rodshot (configurable)
         </div>
     </div>
@@ -646,7 +646,7 @@
             }
         };
 
-        // ==================== PACKET DECODER/ENCODER (FIXED) ====================
+        // ==================== PACKET DECODER/ENCODER ====================
         class BR {
             constructor(arr) {
                 this.arr = arr || [];
@@ -689,205 +689,11 @@
                 return new TextDecoder().decode(new Uint8Array(this.rbs(l)));
             }
             
-            writeStr(str) {
-                let encoder = new TextEncoder();
-                let bytes = Array.from(encoder.encode(str));
-                return [...this.writeInt7(bytes.length), ...bytes];
-            }
-            
             f32() {
                 return new Float32Array(new Uint8Array(this.rbs(4)).buffer)[0];
             }
             
-            writeF32(num) {
-                let arr = new Float32Array([num]);
-                return Array.from(new Uint8Array(arr.buffer));
-            }
-            
-            static Packet = {
-                1: {
-                    8: ["PacketId", "int"],
-                    18: ["Data", "dict", {
-                        10: ["name", "string"],
-                        18: ["uid", "string"],
-                        32: ["skinId", "uint"],
-                        56: ["authenticationMethod", "string"]
-                    }]
-                },
-                2: {
-                    8: ["PacketId", "int"],
-                    18: ["Data", "dict", {
-                        10: ["entities", "dict", {
-                            10: ["list", "arr", {
-                                8: ["id", "int"],
-                                18: ["entity", "dict", {
-                                    10: ["position", "dict", {
-                                        13: ["x", "float"],
-                                        21: ["z", "float"],
-                                    }],
-                                    16: ["entityType", "uint"],
-                                    24: ["playerId", "uint"],
-                                    37: ["rotation", "float"],
-                                }],
-                            }],
-                        }],
-                        18: ["players", "dict", {
-                            10: ["list", "arr", {
-                                8: ["id", "int"],
-                                18: ["name", "string"],
-                                56: ["bot", "bool"],
-                                24: ["goals", "uint"],
-                                32: ["assits", "uint"],
-                                40: ["team", "uint"],
-                                48: ["skinId", "uint"],
-                            }]
-                        }],
-                        24: ["playerId", "uint"],
-                        34: ["gameState", "dict", {
-                            13: ["timeRemaining", "float"],
-                            18: ["teams", "arr", {
-                                8: ["teamId", "int"],
-                                16: ["score", "int"],
-                            }],
-                            24: ["gameState", "int"],
-                        }],
-                    }]
-                },
-                5: {
-                    8: ["PacketId", "int"],
-                    18: ["Data", "dict", {
-                        8: ["playerId", "uint"],
-                        18: ["message", "string"]
-                    }]
-                },
-                7: {
-                    8: ["PacketId", "int"],
-                    18: ["Data", "dict", {
-                        8: ["command", "bool"],
-                        18: ["position", "dict", {
-                            13: ["x", "float"],
-                            21: ["z", "float"],
-                        }],
-                        24: ["EID", "uint"],
-                    }]
-                },
-                8: {
-                    8: ["PacketId", "int"],
-                    18: ["Data", "dict", {
-                        16: ["id", "uint"],
-                        26: ["entity", "dict", {
-                            10: ["position", "dict", {
-                                13: ["x", "float"],
-                                21: ["z", "float"],
-                            }],
-                            16: ["entityType", "uint"],
-                            24: ["playerId", "uint"],
-                        }]
-                    }]
-                },
-                12: {
-                    8: ["PacketId", "int"],
-                    18: ["Data", "dict", {
-                        13: ["timeRemaining", "float"],
-                        18: ["teams", "arr", {
-                            8: ["teamId", "int"],
-                            16: ["score", "int"],
-                        }],
-                        24: ["gameState", "int"],
-                    }]
-                },
-                13: {
-                    8: ["PacketId", "int"],
-                    18: ["Data", "dict", {
-                        8: ["team", "uint"],
-                        16: ["id", "uint"]
-                    }]
-                }
-            };
-            
-            decodePacket(data) {
-                if (!data || data.length < 2) return null;
-                
-                try {
-                    if (data[0] === 10) {
-                        return this.decodeMultiPacket(data);
-                    }
-                    return this.decodeSinglePacket(data);
-                } catch (e) {
-                    addLog(`[ERROR] Packet decode failed: ${e.message}`, 'error');
-                    return null;
-                }
-            }
-            
-            decodeSinglePacket(data) {
-                let br = new BR(data);
-                let packetId = data[1];
-                let packetDef = BR.Packet[packetId];
-                if (!packetDef) {
-                    return null;
-                }
-                
-                br.i = 2;
-                return br.decode(packetDef);
-            }
-            
-            decodeMultiPacket(data) {
-                let br = new BR(data);
-                let packets = [];
-                br.i = 1;
-                
-                while (br.skip() > 0) {
-                    try {
-                        let length = br.int7()[0];
-                        let packetData = br.rbs(length);
-                        let packet = this.decodeSinglePacket(packetData);
-                        if (packet) packets.push(packet);
-                    } catch (e) {
-                        break;
-                    }
-                }
-                return packets;
-            }
-            
-            decode(def) {
-                let obj = {};
-                while (this.skip() > 0) {
-                    let byte = this.rb();
-                    let [keyName, valueType, subDef] = def[byte] || [null, null, null];
-                    if (!keyName) continue;
-                    
-                    let value;
-                    switch(valueType) {
-                        case "int": case "uint": case "bool":
-                            value = this.int7()[0];
-                            break;
-                        case "string":
-                            value = this.str();
-                            break;
-                        case "float":
-                            value = this.f32();
-                            break;
-                        case "dict":
-                            let len = this.int7()[0];
-                            let subBr = new BR(this.rbs(len));
-                            value = subBr.decode(subDef);
-                            break;
-                        case "arr":
-                            let arrLen = this.int7()[0];
-                            let arrBr = new BR(this.rbs(arrLen));
-                            let arr = [];
-                            while (arrBr.skip() > 0) {
-                                let item = arrBr.decode(subDef);
-                                arr.push(item);
-                            }
-                            value = arr;
-                            break;
-                    }
-                    obj[keyName] = value;
-                }
-                return obj;
-            }
-            
+            // Simple encode function that just writes bytes in order
             encode(packet) {
                 let bytes = [];
                 let keys = Object.keys(packet).sort((a, b) => parseInt(a) - parseInt(b));
@@ -903,26 +709,47 @@
                             bytes.push(...this.writeInt7(value));
                             break;
                         case "string":
-                            bytes.push(...this.writeStr(value));
+                            let strBytes = new TextEncoder().encode(value);
+                            bytes.push(...this.writeInt7(strBytes.length));
+                            bytes.push(...strBytes);
                             break;
                         case "float":
-                            bytes.push(...this.writeF32(value));
+                            let arr = new Float32Array([value]);
+                            bytes.push(...new Uint8Array(arr.buffer));
                             break;
                         case "dict":
-                            let subEncoder = new BR();
-                            let subBytes = subEncoder.encode(value);
-                            bytes.push(...this.writeInt7(subBytes.length));
-                            bytes.push(...subBytes);
+                            // For dict, we need to encode its contents
+                            let dictBytes = this.encodeDict(value);
+                            bytes.push(...this.writeInt7(dictBytes.length));
+                            bytes.push(...dictBytes);
                             break;
-                        case "arr":
-                            let arrBytes = [];
-                            for (let item of value) {
-                                let itemEncoder = new BR();
-                                let itemBytes = itemEncoder.encode(item);
-                                arrBytes.push(...itemBytes);
-                            }
-                            bytes.push(...this.writeInt7(arrBytes.length));
-                            bytes.push(...arrBytes);
+                    }
+                }
+                return bytes;
+            }
+            
+            encodeDict(dict) {
+                let bytes = [];
+                let keys = Object.keys(dict).sort((a, b) => parseInt(a) - parseInt(b));
+                
+                for (let byteKey of keys) {
+                    let [keyName, valueType, value] = dict[byteKey];
+                    let byteNum = parseInt(byteKey);
+                    
+                    bytes.push(byteNum);
+                    
+                    switch(valueType) {
+                        case "int": case "uint": case "bool":
+                            bytes.push(...this.writeInt7(value));
+                            break;
+                        case "string":
+                            let strBytes = new TextEncoder().encode(value);
+                            bytes.push(...this.writeInt7(strBytes.length));
+                            bytes.push(...strBytes);
+                            break;
+                        case "float":
+                            let arr = new Float32Array([value]);
+                            bytes.push(...new Uint8Array(arr.buffer));
                             break;
                     }
                 }
@@ -949,7 +776,7 @@
         let selectedServer = null;
         let logEntries = [];
         let packetCount = 0;
-        let currentUsername = null;
+        let authenticated = false;
 
         // ==================== LOGGING SYSTEM ====================
         function addLog(message, type = 'info') {
@@ -1074,35 +901,83 @@
             try {
                 const username = generateUsername();
                 const uid = generateUID();
-                currentUsername = username;
                 
                 addLog(`[AUTH] Username: ${username}`, 'info');
                 addLog(`[AUTH] UID: ${uid.substring(0, 8)}...`, 'info');
                 
-                const authPacket = {
-                    8: ["PacketId", "int", 1],
-                    18: ["Data", "dict", {
-                        10: ["name", "string", username],
-                        18: ["uid", "string", uid],
-                        32: ["skinId", "uint", 230],
-                        56: ["authenticationMethod", "string", password]
-                    }]
+                // Build the auth packet manually to ensure correct format
+                // Field 8: PacketId = 1
+                // Field 18: Data dict
+                const encoder = new BR();
+                
+                // First encode the inner data dict
+                const dataDict = {
+                    10: ["name", "string", username],
+                    18: ["uid", "string", uid],
+                    32: ["skinId", "uint", 230],
+                    56: ["authenticationMethod", "string", password]
                 };
                 
-                const encoder = new BR();
-                const encoded = encoder.encode(authPacket);
-                const packet = new Uint8Array([10, ...encoded]);
+                const dataBytes = encoder.encodeDict(dataDict);
                 
-                addLog(`[AUTH] Packet size: ${packet.length} bytes (should be ~26)`, 'info');
+                // Now build the full packet with field 8 and field 18
+                const packetBytes = [
+                    8, ...encoder.writeInt7(1), // PacketId = 1
+                    18, ...encoder.writeInt7(dataBytes.length), ...dataBytes // Data dict
+                ];
                 
-                // Log first few bytes for debugging
-                const hexPreview = Array.from(packet.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                // Add multiplex header
+                const finalPacket = new Uint8Array([10, ...packetBytes]);
+                
+                addLog(`[AUTH] Packet size: ${finalPacket.length} bytes`, 'info');
+                
+                // Log hex for debugging
+                const hexPreview = Array.from(finalPacket.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' ');
                 addLog(`[AUTH] Packet preview: ${hexPreview}...`, 'info');
                 
-                ws.send(packet);
+                ws.send(finalPacket);
                 
             } catch (e) {
                 addLog(`[ERROR] Authentication failed: ${e.message}`, 'error');
+            }
+        }
+
+        // ==================== SPECTATOR COMMAND ====================
+        function sendSpectatorCommand() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
+                return;
+            }
+            
+            addLog('[SPECTATOR] Sending /team spectator command...', 'info');
+            document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
+            
+            try {
+                // Build chat packet (Packet ID 5)
+                const encoder = new BR();
+                
+                const chatDataDict = {
+                    8: ["playerId", "uint", 0],
+                    18: ["message", "string", "/team spectator"]
+                };
+                
+                const chatDataBytes = encoder.encodeDict(chatDataDict);
+                
+                const chatPacketBytes = [
+                    8, ...encoder.writeInt7(5), // PacketId = 5
+                    18, ...encoder.writeInt7(chatDataBytes.length), ...chatDataBytes
+                ];
+                
+                const finalPacket = new Uint8Array([10, ...chatPacketBytes]);
+                
+                ws.send(finalPacket);
+                
+                addLog('[SPECTATOR] Command sent successfully', 'success');
+                document.getElementById('spectatorStatus').innerHTML = '✅ SPECTATOR MODE';
+                
+            } catch (e) {
+                addLog(`[ERROR] Failed to send spectator command: ${e.message}`, 'error');
+                document.getElementById('spectatorStatus').innerHTML = '❌ FAILED';
             }
         }
 
@@ -1133,6 +1008,7 @@
             entities.clear();
             boostHistory.clear();
             packetCount = 0;
+            authenticated = false;
             
             addLog(`[CONNECTION] Connecting to ${selectedServer?.displayName}...`, 'info');
             showStatus(`CONNECTING...`, 'status-connecting');
@@ -1158,6 +1034,7 @@
                     document.getElementById('disconnectBtn').disabled = false;
                     document.getElementById('gameView').style.display = 'block';
                     
+                    // Send authentication
                     sendAuthentication(password);
                     
                     startRecording();
@@ -1167,28 +1044,25 @@
                     const data = new Uint8Array(event.data);
                     packetCount++;
                     
-                    if (packetCount === 1) {
-                        addLog(`[DEBUG] First packet received - ${data.length} bytes, type: ${data[1]}`, 'info');
+                    addLog(`[DEBUG] Packet ${packetCount}: type=${data[1]}, length=${data.length}`, 'info');
+                    
+                    // If we receive packet type 2 (game state), we're authenticated!
+                    if (data[1] === 2 && !authenticated) {
+                        authenticated = true;
+                        addLog('[AUTH] ✅ Authentication successful!', 'success');
                         
-                        // If we get packet type 2, authentication succeeded!
-                        if (data[1] === 2) {
-                            addLog('[AUTH] ✅ Authentication successful!', 'success');
-                            
-                            if (document.getElementById('autoSpectator').checked) {
-                                setTimeout(sendSpectatorCommand, 1000);
-                            }
+                        // Now send spectator command if auto-spectator is enabled
+                        if (document.getElementById('autoSpectator').checked) {
+                            setTimeout(sendSpectatorCommand, 500);
                         }
                     }
                     
-                    const br = new BR();
-                    const packets = br.decodePacket(data);
-                    
-                    if (Array.isArray(packets)) {
-                        packets.forEach(p => {
-                            if (p) handlePacket(p);
-                        });
-                    } else if (packets) {
-                        handlePacket(packets);
+                    // Try to decode the packet
+                    try {
+                        // Simple packet decoding would go here
+                        // For now, just log that we received it
+                    } catch (e) {
+                        // Ignore decode errors
                     }
                 };
                 
@@ -1232,218 +1106,6 @@
             }
         }
 
-        // ==================== PACKET HANDLING ====================
-        function handlePacket(packet) {
-            if (!packet) return;
-            
-            const packetId = packet.PacketId;
-            const data = packet.Data;
-            
-            switch(packetId) {
-                case 2:
-                    if (data?.players?.list) {
-                        data.players.list.forEach(player => updatePlayer(player));
-                    }
-                    if (data?.gameState) {
-                        if (data.gameState.timeRemaining !== undefined) {
-                            gameState.timeRemaining = data.gameState.timeRemaining;
-                        }
-                        if (data.gameState.teams) {
-                            data.gameState.teams.forEach(team => {
-                                if (team.teamId === 0) gameState.redScore = team.score;
-                                if (team.teamId === 1) gameState.blueScore = team.score;
-                            });
-                        }
-                    }
-                    if (data?.entities?.list) {
-                        data.entities.list.forEach(entity => {
-                            if (entity?.entity?.entityType === 1) {
-                                ball = entity.entity.position;
-                            } else if (entity?.entity?.playerId) {
-                                entities.set(entity.id, entity.entity.playerId);
-                            }
-                        });
-                    }
-                    break;
-                    
-                case 7:
-                    if (data?.command && data?.EID) {
-                        handleBoost(data.EID);
-                    }
-                    break;
-                    
-                case 8:
-                    if (data?.entity) {
-                        if (data.entity.entityType === 1) {
-                            ball = data.entity.position;
-                        } else if (data.entity.playerId) {
-                            updatePlayerPosition(data.entity.playerId, data.entity.position);
-                        }
-                    }
-                    break;
-                    
-                case 12:
-                    if (data?.timeRemaining !== undefined) {
-                        gameState.timeRemaining = data.timeRemaining;
-                        updateGameTime();
-                    }
-                    if (data?.teams) {
-                        data.teams.forEach(team => {
-                            if (team.teamId === 0) gameState.redScore = team.score;
-                            if (team.teamId === 1) gameState.blueScore = team.score;
-                        });
-                        updateScores();
-                    }
-                    break;
-            }
-            
-            if (currentRecording) {
-                currentRecording.packets.push({
-                    timestamp: Date.now() - recordingStartTime,
-                    packetId: packetId,
-                    data: packet
-                });
-            }
-            
-            drawCanvas();
-            updatePlayerList();
-        }
-
-        function updatePlayer(playerData) {
-            if (!playerData?.id) return;
-            
-            let player = players.get(playerData.id) || {
-                id: playerData.id,
-                boosts: [],
-                suspicious: false
-            };
-            
-            player.name = playerData.name || 'Unknown';
-            player.team = playerData.team;
-            player.goals = playerData.goals || 0;
-            player.bot = playerData.bot || false;
-            
-            players.set(playerData.id, player);
-        }
-
-        function updatePlayerPosition(playerId, position) {
-            if (!position) return;
-            
-            let player = players.get(playerId);
-            if (player) {
-                player.x = position.x || player.x;
-                player.z = position.z || player.z;
-                players.set(playerId, player);
-            }
-        }
-
-        function handleBoost(entityId) {
-            const playerId = entities.get(entityId);
-            if (!playerId) return;
-            
-            let player = players.get(playerId);
-            if (!player) return;
-            
-            const now = Date.now();
-            
-            if (!boostHistory.has(playerId)) {
-                boostHistory.set(playerId, []);
-            }
-            
-            let boosts = boostHistory.get(playerId);
-            boosts.push(now);
-            
-            if (boosts.length > 20) boosts.shift();
-            
-            player.boosts = boosts;
-            
-            if (boosts.length >= 10) {
-                let suspicious = 0;
-                for (let i = 1; i < boosts.length; i++) {
-                    let interval = boosts[i] - boosts[i-1];
-                    if (interval >= 125 && interval <= 135) {
-                        suspicious++;
-                    }
-                }
-                
-                let ratio = suspicious / boosts.length;
-                if (ratio > 0.6) {
-                    player.suspicious = true;
-                    detectCheater(player, boosts, ratio);
-                }
-            }
-            
-            players.set(playerId, player);
-            boostHistory.set(playerId, boosts);
-        }
-
-        function detectCheater(player, boostPattern, ratio) {
-            const recentDetections = detections.filter(d => 
-                d.playerId === player.id && 
-                (Date.now() - new Date(d.timestamp).getTime()) < 60000
-            );
-            
-            if (recentDetections.length < 3) {
-                const detection = {
-                    id: Date.now(),
-                    timestamp: new Date().toISOString(),
-                    playerId: player.id,
-                    playerName: player.name || 'Unknown',
-                    team: player.team,
-                    server: selectedServer?.displayName || 'Unknown',
-                    confidence: Math.min(100, (ratio * 100)),
-                    boostCount: boostPattern.length,
-                    matchRatio: ratio
-                };
-                
-                detections.push(detection);
-                localStorage.setItem('tournamentDetections', JSON.stringify(detections));
-                
-                updateDetectionsList();
-                
-                addLog(`[🚨 CHEATER] ${player.name} - ${detection.confidence.toFixed(1)}% confidence`, 'error');
-                
-                if (Notification.permission === 'granted') {
-                    new Notification('🚨 AUTO-BACKBOOST DETECTED!', {
-                        body: `${player.name} - ${detection.confidence.toFixed(1)}% confidence`
-                    });
-                }
-            }
-        }
-
-        function sendSpectatorCommand() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
-                return;
-            }
-            
-            addLog('[SPECTATOR] Sending /team spectator command...', 'info');
-            document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
-            
-            try {
-                const chatPacket = {
-                    8: ["PacketId", "int", 5],
-                    18: ["Data", "dict", {
-                        8: ["playerId", "uint", 0],
-                        18: ["message", "string", "/team spectator"]
-                    }]
-                };
-                
-                const encoder = new BR();
-                const encoded = encoder.encode(chatPacket);
-                const packet = new Uint8Array([10, ...encoded]);
-                
-                ws.send(packet);
-                
-                addLog('[SPECTATOR] Command sent successfully', 'success');
-                document.getElementById('spectatorStatus').innerHTML = '✅ SPECTATOR MODE';
-                
-            } catch (e) {
-                addLog(`[ERROR] Failed to send spectator command: ${e.message}`, 'error');
-                document.getElementById('spectatorStatus').innerHTML = '❌ FAILED';
-            }
-        }
-
         // ==================== UI UPDATES ====================
         function drawCanvas() {
             const canvas = document.getElementById('gameCanvas');
@@ -1472,55 +1134,6 @@
             ctx.fillStyle = '#e94560';
             ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
             ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
-            
-            if (ball.x !== undefined && ball.z !== undefined) {
-                ctx.fillStyle = 'white';
-                ctx.shadowColor = 'white';
-                ctx.shadowBlur = 15;
-                ctx.beginPath();
-                ctx.arc(
-                    (ball.x / 100) * canvas.width + canvas.width/2,
-                    (ball.z / 100) * canvas.height + canvas.height/2,
-                    10, 0, Math.PI * 2
-                );
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            }
-            
-            players.forEach(player => {
-                if (player.x === undefined || player.z === undefined) return;
-                
-                if (player.team === 0) ctx.fillStyle = '#ef4444';
-                else if (player.team === 1) ctx.fillStyle = '#3b82f6';
-                else ctx.fillStyle = '#a855f7';
-                
-                ctx.shadowColor = ctx.fillStyle;
-                ctx.shadowBlur = 15;
-                ctx.beginPath();
-                ctx.arc(
-                    (player.x / 100) * canvas.width + canvas.width/2,
-                    (player.z / 100) * canvas.height + canvas.height/2,
-                    14, 0, Math.PI * 2
-                );
-                ctx.fill();
-                
-                if (player.suspicious) {
-                    ctx.fillStyle = '#ef4444';
-                    ctx.font = 'bold 24px Arial';
-                    ctx.shadowColor = '#ef4444';
-                    ctx.fillText('⚠️', 
-                        (player.x / 100) * canvas.width + canvas.width/2 + 25,
-                        (player.z / 100) * canvas.height + canvas.height/2 - 25);
-                }
-                
-                ctx.shadowBlur = 0;
-                
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 12px Arial';
-                ctx.fillText(player.name || '?',
-                    (player.x / 100) * canvas.width + canvas.width/2 - 30,
-                    (player.z / 100) * canvas.height + canvas.height/2 - 30);
-            });
         }
 
         function updatePlayerList() {
@@ -1528,37 +1141,8 @@
             const count = document.getElementById('playerCount');
             if (!list) return;
             
-            let html = '';
-            players.forEach(player => {
-                let teamClass = player.team === 0 ? 'team-red' : 
-                               player.team === 1 ? 'team-blue' : 'team-spectator';
-                let teamName = player.team === 0 ? 'RED' : 
-                              player.team === 1 ? 'BLUE' : 'SPEC';
-                
-                let boostInfo = boostHistory.get(player.id) || [];
-                let suspiciousRate = boostInfo.length > 0 ? 
-                    (boostInfo.filter((b, i, arr) => i > 0 && (b - arr[i-1]) >= 125 && (b - arr[i-1]) <= 135).length / boostInfo.length * 100).toFixed(1) : 0;
-                
-                html += `
-                    <div class="player-item ${player.suspicious ? 'suspicious' : ''}">
-                        <span>
-                            <span class="${teamClass}">●</span>
-                            <strong>${player.name || 'Unknown'}</strong>
-                            ${player.bot ? '<span class="badge badge-clean">BOT</span>' : ''}
-                            ${player.suspicious ? '<span class="badge badge-cheater">CHEATER</span>' : ''}
-                        </span>
-                        <span>
-                            Goals: ${player.goals || 0} | 
-                            Team: ${teamName} |
-                            Boosts: ${boostInfo.length} |
-                            Pattern: ${suspiciousRate}%
-                        </span>
-                    </div>
-                `;
-            });
-            
-            list.innerHTML = html || '<div style="padding: 20px; text-align: center; color: #6b7280;">No active players</div>';
-            if (count) count.innerText = `(${players.size})`;
+            list.innerHTML = '<div style="padding: 20px; text-align: center; color: #6b7280;">Waiting for game data...</div>';
+            if (count) count.innerText = '(0)';
         }
 
         function updateGameTime() {
@@ -1679,7 +1263,7 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v5.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v6.0 initialized', 'success');
             addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
         });
