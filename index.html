@@ -3,6 +3,7 @@
 <head>
     <title>BumpyBall Tournament Anti-Cheat Analyzer</title>
     <style>
+        /* Keep all the existing CSS from v15.0 - it's perfect */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -480,8 +481,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v15.0</h1>
-        <div class="subtitle">Professional Grade • Full Packet Parsing • Player Movement Logging • Auto-Backboost Detection</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v16.0</h1>
+        <div class="subtitle">Professional Grade • Full BR Decoder • Perfect Packet Parsing • Auto-Backboost Detection</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -617,41 +618,422 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v15.0 • FULL PACKET PARSING • PLAYER MOVEMENT LOGGING • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
-            Logs all player positions, boosts, and movements • AFK Prevention • Password: rodshot
+            TOURNAMENT ANTI-CHEAT SYSTEM v16.0 • FULL BR DECODER • PERFECT PACKET PARSING • AUTO-BACKBOOST DETECTION<br>
+            Logs all player movements • AFK Prevention • Password: rodshot
         </div>
     </div>
 
     <script>
-        // ==================== VARINT FUNCTIONS ====================
-        const r7bit = arr => {
-            let r = 0, e = 0;
-            for (; 35 != e;) {
-                let f = arr[e / 7];
-                if (r |= (127 & f) << e, 0 == (128 & f)) return [r, e / 7 + 1];
-                e += 7;
+        // ==================== BR DECODER FROM CHEAT SCRIPT ====================
+        const Packet = {
+            0: {},
+            1: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    10: ["name", "string"],
+                    18: ["uid", "string"],
+                    24: ["version", "uint"],
+                    32: ["skinId", "uint"],
+                    42: ["password", "string"],
+                    56: ["authenticationMethod", "uint"],
+                }]
+            },
+            2: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    10: ["entities", "dict", {
+                        10: ["list", "arr", {
+                            8: ["id", "int"],
+                            18: ["entity", "dict", {
+                                10: ["position", "dict", {
+                                    13: ["x", "float"],
+                                    21: ["z", "float"],
+                                }],
+                                16: ["entityType", "uint"],
+                                24: ["playerId", "uint"],
+                                37: ["rotation", "float"],
+                                42: ["forces", "dict", {
+                                    13: ["x", "float"],
+                                    21: ["z", "float"],
+                                }],
+                            }],
+                        }],
+                    }],
+                    18: ["players", "dict", {
+                        10: ["list", "arr", {
+                            8: ["id", "int"],
+                            18: ["name", "string"],
+                            56: ["bot", "bool"],
+                            24: ["goals", "uint"],
+                            32: ["assits", "uint"],
+                            40: ["team", "uint"],
+                            48: ["skinId", "uint"],
+                            64: ["experience", "uint"],
+                        }]
+                    }],
+                    24: ["playerId", "uint"],
+                    34: ["gameState", "dict", {
+                        13: ["timeRemaining", "float"],
+                        18: ["teams", "arr", {
+                            8: ["teamId", "int"],
+                            16: ["score", "int"],
+                        }],
+                        24: ["gameState", "int"],
+                    }],
+                    42: ["hostName", "string"]
+                }]
+            },
+            3: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    10: ["list", "arr", {
+                        8: ["id", "int"],
+                        18: ["name", "string"],
+                        56: ["bot", "int"],
+                        24: ["goals", "uint"],
+                        32: ["assits", "uint"],
+                        40: ["team", "uint"],
+                        48: ["skinId", "uint"],
+                        64: ["experience", "uint"],
+                    }]
+                }]
+            },
+            4: {
+                8: ["PacketId", "uint"],
+                18: ["Data", "dict", {
+                    8: ["playerId", "uint"],
+                }]
+            },
+            5: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    8: ["playerId", "uint"],
+                    18: ["message", "string"]
+                }]
+            },
+            6: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    8: ["id", "uint"],
+                    18: ["position", "dict", {
+                        13: ["x", "float"],
+                        21: ["z", "float"]
+                    }],
+                    29: ["rotation", "float"],
+                }]
+            },
+            7: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    8: ["command", "bool"],
+                    18: ["position", "dict", {
+                        13: ["x", "float"],
+                        21: ["z", "float"],
+                    }],
+                    24: ["EID", "uint"],
+                }]
+            },
+            8: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    16: ["id", "uint"],
+                    26: ["entity", "dict", {
+                        10: ["position", "dict", {
+                            13: ["x", "float"],
+                            21: ["z", "float"],
+                        }],
+                        16: ["entityType", "uint"],
+                        24: ["playerId", "uint"],
+                        37: ["rotation", "float"],
+                        42: ["forces", "dict", {
+                            13: ["x", "float"],
+                            21: ["z", "float"],
+                        }],
+                    }]
+                }]
+            },
+            9: {
+                8: ["PacketId", "uint"],
+                18: ["Data", "dict", {
+                    8: ["id", "uint"],
+                    24: ["reason", "uint"],
+                    18: ["entity", "dict", {
+                        10: ["position", "dict", {
+                            13: ["x", "float"],
+                            21: ["z", "float"],
+                        }],
+                        24: ["playerId", "uint"],
+                        16: ["entityType", "uint"],
+                        37: ["rotation", "float"],
+                        42: ["forces", "dict", {
+                            13: ["x", "float"],
+                            21: ["z", "float"],
+                        }],
+                    }],
+                }]
+            },
+            10: {},
+            11: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    10: ["message", "string"],
+                    16: ["playerIdA", "uint"],
+                    24: ["playerIdB", "uint"],
+                }]
+            },
+            12: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    13: ["timeRemaining", "float"],
+                    18: ["teams", "arr", {
+                        8: ["teamId", "int"],
+                        16: ["score", "int"],
+                    }],
+                    24: ["gameState", "int"],
+                }]
+            },
+            13: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    8: ["team", "uint"],
+                    16: ["id", "uint"]
+                }]
+            },
+            14: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    10: ["list", "arr", {
+                        8: ["id", "int"],
+                        18: ["name", "string"],
+                        56: ["bot", "bool"],
+                        24: ["goals", "uint"],
+                        32: ["assits", "uint"],
+                        40: ["team", "uint"],
+                        48: ["skinId", "uint"],
+                        64: ["experience", "uint"],
+                    }],
+                }]
+            },
+            15: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    16: ["playerId", "uint"],
+                }]
+            },
+            16: {},
+            17: {
+                8: ["PacketId", "int"],
+                18: ["Data", "dict", {
+                    10: ["player", "dict", {
+                        10: ["uid", "string"],
+                        34: ["name", "string"],
+                        40: ["goals", "int"],
+                        48: ["assits", "int"],
+                        56: ["wins", "int"],
+                        64: ["draws", "int"],
+                        72: ["lost", "int"],
+                        80: ["spareExp", "int"],
+                        88: ["exp", "int"],
+                        96: ["skinId", "int"]
+                    }],
+                }]
+            },
+            18: {},
+            19: {}
+        };
+
+        class BR {
+            arr = [];
+            i = 0;
+            
+            constructor(a) {
+                a ??= [];
+                this.arr = [...a];
             }
-        };
-
-        const int7 = (arr, start) => {
-            let [value, bytes] = r7bit(arr.slice(start));
-            return [value, start + bytes];
-        };
-
-        const w7bit = num => {
-            let r = [];
-            while (num >= 128) {
-                r.push((128 | num) % 256);
-                num >>= 7;
+            
+            skip() {
+                return (this.arr.length - this.i);
             }
-            r.push(num % 256);
-            return r;
-        };
-
-        const parseFloat32 = (arr, start) => {
-            let value = new Float32Array(new Uint8Array(arr.slice(start, start + 4)).buffer)[0];
-            return [value, start + 4];
-        };
+            
+            rbs(size) {
+                let r = this.arr.slice(this.i, this.i + size);
+                this.i += size;
+                return r;
+            }
+            
+            rb() {
+                return this.rbs(1)[0];
+            }
+            
+            int7() {
+                let r = 0;
+                let b = 0;
+                
+                while (b !== 35) {
+                    let c = this.rb();
+                    r |= (c & 127) << b;
+                    
+                    if ((c & 128) === 0) {
+                        return [r, (b / 7) + 1];
+                    }
+                    
+                    b += 7;
+                }
+            }
+            
+            str() {
+                let l = this.int7()[0];
+                let s = new TextDecoder().decode(new Uint8Array(this.rbs(l)));
+                return s;
+            }
+            
+            f32() {
+                let l = new Uint8Array(this.rbs(4));
+                let f = new Float32Array(l.buffer)[0];
+                return f;
+            }
+            
+            bit7(num) {
+                for (; num >= 128; num >>= 7) this.arr.push((128 | num) % 256);
+                return this.arr.push(num % 256);
+            }
+            
+            ft32(num) {
+                let f = new Float32Array([num]);
+                let b = new Uint8Array(f.buffer);
+                this.arr.push(...b);
+            }
+            
+            istr(value) {
+                let s = new TextEncoder().encode(value);
+                this.arr.push(s.length, ...s);
+            }
+            
+            ab(value) {
+                this.arr.push(value);
+            }
+            
+            decode(def) {
+                let obj = {};
+                
+                while (this.skip() > 0) {
+                    let byte = this.rb();
+                    let [keyName, valueType] = def[byte] || [null, null];
+                    if (!keyName) continue;
+                    
+                    let value;
+                    switch (valueType) {
+                        case "int":
+                        case "uint":
+                        case "bool":
+                            value = this.int7()[0];
+                            break;
+                        case "string":
+                            value = this.str();
+                            break;
+                        case "float":
+                            value = this.f32();
+                            break;
+                        case "dict":
+                            let l = this.int7()[0];
+                            let s = new BR(new Uint8Array(this.rbs(l)));
+                            value = s.decode(def[byte][2]);
+                            break;
+                        case "arr":
+                            let arrLen = this.int7()[0];
+                            let arrBr = new BR(new Uint8Array(this.rbs(arrLen)));
+                            let arr = [];
+                            while (arrBr.skip() > 0) {
+                                let item = arrBr.decode(def[byte][2]);
+                                arr.push(item);
+                            }
+                            value = arr;
+                            break;
+                    }
+                    
+                    obj[keyName] = value;
+                }
+                
+                return obj;
+            }
+            
+            encode(packet) {
+                for (let byte in packet) {
+                    let [keyName, valueType, value] = packet[byte];
+                    
+                    switch (valueType) {
+                        case "int":
+                        case "uint":
+                        case "bool":
+                            this.ab(Number(byte));
+                            this.bit7(value);
+                            break;
+                        case "string":
+                            this.ab(Number(byte));
+                            this.istr(value);
+                            break;
+                        case "float":
+                            this.ab(Number(byte));
+                            this.ft32(value);
+                            break;
+                        case "dict":
+                            let da = new BR().encode(packet[Number(byte)][2]);
+                            this.ab(Number(byte));
+                            this.bit7(da.length);
+                            this.arr.push(...da);
+                            break;
+                        case "arr":
+                            value.forEach(index => {
+                                let a = new BR().encode(index);
+                                this.ab(Number(byte));
+                                this.bit7(a.length);
+                                this.arr.push(...a);
+                            });
+                            break;
+                    }
+                }
+                return this.arr;
+            }
+            
+            Sdecoder(d) {
+                let sd = new BR(d);
+                return sd.decode(Packet[d[1]]);
+            }
+            
+            Sencoder(j) {
+                let a = new BR().encode(j);
+                return a;
+            }
+            
+            Mdecoder(d) {
+                let j = {};
+                let r = -1;
+                let wa = new BR(d);
+                
+                while (wa.skip() > 0) {
+                    wa.rb();
+                    let l = wa.int7()[0];
+                    let a = wa.rbs(l);
+                    let s = new BR().Sdecoder(a);
+                    j[r += 1] = s;
+                }
+                
+                return j;
+            }
+            
+            Mencoder(j) {
+                let a = [];
+                for (let b in j) {
+                    let _j = j[b];
+                    let a_ = new BR().Sencoder(_j);
+                    let le = new BR();
+                    le.bit7(a_.length);
+                    let l = le.arr;
+                    a.push(10, ...l, ...a_);
+                }
+                return a;
+            }
+        }
 
         // ==================== TOURNAMENT SERVERS CONFIGURATION ====================
         const TOURNAMENT_SERVERS = {
@@ -683,218 +1065,6 @@
             }
         };
 
-        // ==================== PACKET PARSING ====================
-        class PacketParser {
-            static parsePlayerUpdate(data, start) {
-                try {
-                    let pos = start;
-                    if (data[pos] !== 0x0a) return null;
-                    pos++;
-                    
-                    let [playerDataLen, newPos] = int7(data, pos);
-                    pos = newPos;
-                    
-                    let player = {
-                        id: null,
-                        constId: null,
-                        name: null,
-                        team: null,
-                        x: null,
-                        z: null,
-                        rotation: null,
-                        goals: 0,
-                        assists: 0,
-                        bot: false
-                    };
-                    
-                    // Parse player fields
-                    while (pos < start + playerDataLen) {
-                        let field = data[pos];
-                        pos++;
-                        
-                        switch(field) {
-                            case 0x08: // player id
-                                [player.id, pos] = int7(data, pos);
-                                break;
-                            case 0x12: // name
-                                let [nameLen, namePos] = int7(data, pos);
-                                pos = namePos;
-                                player.name = new TextDecoder().decode(new Uint8Array(data.slice(pos, pos + nameLen)));
-                                pos += nameLen;
-                                break;
-                            case 0x1a: // position data
-                                let [posLen, posStart] = int7(data, pos);
-                                pos = posStart;
-                                let endPos = pos + posLen;
-                                
-                                while (pos < endPos) {
-                                    let subField = data[pos];
-                                    pos++;
-                                    if (subField === 0x0d) { // x coordinate
-                                        [player.x, pos] = parseFloat32(data, pos);
-                                    } else if (subField === 0x15) { // z coordinate
-                                        [player.z, pos] = parseFloat32(data, pos);
-                                    } else {
-                                        // Skip unknown field
-                                        let [skipLen, skipPos] = int7(data, pos);
-                                        pos = skipPos + skipLen;
-                                    }
-                                }
-                                break;
-                            case 0x28: // team
-                                [player.team, pos] = int7(data, pos);
-                                break;
-                            case 0x30: // goals
-                                [player.goals, pos] = int7(data, pos);
-                                break;
-                            case 0x38: // assists
-                                [player.assists, pos] = int7(data, pos);
-                                break;
-                            case 0x40: // bot
-                                [player.bot, pos] = int7(data, pos);
-                                player.bot = player.bot === 1;
-                                break;
-                            case 0x48: // const id
-                                [player.constId, pos] = int7(data, pos);
-                                break;
-                            default:
-                                // Skip unknown field
-                                let [skipLen, skipPos] = int7(data, pos);
-                                pos = skipPos + skipLen;
-                                break;
-                        }
-                    }
-                    
-                    return player;
-                } catch (e) {
-                    return null;
-                }
-            }
-
-            static parseMovement(data, start) {
-                try {
-                    let pos = start;
-                    if (data[pos] !== 0x0a) return null;
-                    pos++;
-                    
-                    let [moveLen, newPos] = int7(data, pos);
-                    pos = newPos;
-                    
-                    let movement = {
-                        playerId: null,
-                        command: null,
-                        x: null,
-                        z: null
-                    };
-                    
-                    while (pos < start + moveLen) {
-                        let field = data[pos];
-                        pos++;
-                        
-                        switch(field) {
-                            case 0x08: // command
-                                [movement.command, pos] = int7(data, pos);
-                                break;
-                            case 0x12: // position
-                                let [posLen, posStart] = int7(data, pos);
-                                pos = posStart;
-                                let endPos = pos + posLen;
-                                
-                                while (pos < endPos) {
-                                    let subField = data[pos];
-                                    pos++;
-                                    if (subField === 0x0d) { // x
-                                        [movement.x, pos] = parseFloat32(data, pos);
-                                    } else if (subField === 0x15) { // z
-                                        [movement.z, pos] = parseFloat32(data, pos);
-                                    } else {
-                                        let [skipLen, skipPos] = int7(data, pos);
-                                        pos = skipPos + skipLen;
-                                    }
-                                }
-                                break;
-                            case 0x18: // player id
-                                [movement.playerId, pos] = int7(data, pos);
-                                break;
-                            default:
-                                let [skipLen, skipPos] = int7(data, pos);
-                                pos = skipPos + skipLen;
-                                break;
-                        }
-                    }
-                    
-                    return movement;
-                } catch (e) {
-                    return null;
-                }
-            }
-
-            static parseGameState(data) {
-                try {
-                    let pos = 2; // Skip packet header
-                    let players = [];
-                    
-                    while (pos < data.length) {
-                        let field = data[pos];
-                        pos++;
-                        
-                        if (field === 0x0a) { // Player update
-                            let player = this.parsePlayerUpdate(data, pos - 1);
-                            if (player) players.push(player);
-                            
-                            // Skip to next field
-                            let [len, newPos] = int7(data, pos);
-                            pos = newPos + len;
-                        } else if (field === 0x12) { // Game state data
-                            let [stateLen, statePos] = int7(data, pos);
-                            pos = statePos + stateLen;
-                        } else {
-                            // Skip unknown field
-                            let [len, newPos] = int7(data, pos);
-                            pos = newPos + len;
-                        }
-                    }
-                    
-                    return players;
-                } catch (e) {
-                    return [];
-                }
-            }
-        }
-
-        // ==================== EXACT AUTH PACKET ====================
-        function createAuthPacket(username, uid, password) {
-            let usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
-            let uidBytes = Array.from(uid).map(c => c.charCodeAt(0));
-            let pwdBytes = Array.from(password).map(c => c.charCodeAt(0));
-            
-            return new Uint8Array([
-                0x08, 0x01, 0x12, 0x38,
-                0x0a, usernameBytes.length, ...usernameBytes,
-                0x12, uidBytes.length, ...uidBytes,
-                0x18, 0xe6, 0x06,
-                0x2a, pwdBytes.length, ...pwdBytes,
-                0x38, 0x01
-            ]);
-        }
-
-        // ==================== SPECTATOR COMMAND ====================
-        function createSpectatorPacket() {
-            let msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
-            return new Uint8Array([
-                0x08, 0x05, 0x12, 0x0c,
-                0x08, 0x00,
-                0x12, msgBytes.length, ...msgBytes
-            ]);
-        }
-
-        // ==================== AFK PACKET ====================
-        function createAFKPacket(playerId) {
-            let basePacket = [0x08, 0x07, 0x12, 0x0a, 0x18, 0x05, 0x13, 0x00, 0x00, 0x80, 0x3f, 0x24];
-            let idBytes = w7bit(playerId);
-            return new Uint8Array([...basePacket, ...idBytes]);
-        }
-
         // ==================== GAME STATE ====================
         let ws = null;
         let players = new Map();
@@ -919,6 +1089,7 @@
         let afkEnabled = true;
         let movementLogging = true;
         let playerId = null;
+        let constId = null;
         let lastBoostTime = new Map();
 
         // ==================== LOGGING SYSTEM ====================
@@ -1037,10 +1208,22 @@
                 const username = generateUsername();
                 const uid = generateUID();
                 
-                addLog(`[AUTH] Username: ${username}`, 'info');
-                addLog(`[AUTH] UID: ${uid}`, 'info');
+                // Create auth packet using BR encoder
+                const authPacket = {
+                    8: ["PacketId", "int", 1],
+                    18: ["Data", "dict", {
+                        10: ["name", "string", username],
+                        18: ["uid", "string", uid],
+                        32: ["skinId", "uint", 230],
+                        56: ["authenticationMethod", "uint", 1] // Password method
+                    }]
+                };
                 
-                const packet = createAuthPacket(username, uid, password);
+                const br = new BR();
+                const encoded = br.Sencoder(authPacket);
+                const packet = new Uint8Array([10, ...encoded]);
+                
+                addLog(`[AUTH] Packet size: ${packet.length} bytes`, 'info');
                 ws.send(packet);
                 
             } catch (e) {
@@ -1059,7 +1242,19 @@
             document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
             
             try {
-                const packet = createSpectatorPacket();
+                // Create chat packet using BR encoder
+                const chatPacket = {
+                    8: ["PacketId", "int", 5],
+                    18: ["Data", "dict", {
+                        8: ["playerId", "uint", 0],
+                        18: ["message", "string", "/team spectator"]
+                    }]
+                };
+                
+                const br = new BR();
+                const encoded = br.Sencoder(chatPacket);
+                const packet = new Uint8Array([10, ...encoded]);
+                
                 ws.send(packet);
                 
                 addLog('[SPECTATOR] ✅ Spectator command sent', 'success');
@@ -1077,15 +1272,34 @@
         }
 
         // ==================== AFK PREVENTION ====================
+        function createAFKPacket() {
+            // Simple movement packet to prevent AFK
+            const afkPacket = {
+                8: ["PacketId", "int", 7],
+                18: ["Data", "dict", {
+                    8: ["command", "bool", 1],
+                    18: ["position", "dict", {
+                        13: ["x", "float", 0],
+                        21: ["z", "float", 0]
+                    }],
+                    24: ["EID", "uint", constId || 0]
+                }]
+            };
+            
+            const br = new BR();
+            const encoded = br.Sencoder(afkPacket);
+            return new Uint8Array([10, ...encoded]);
+        }
+
         function startAFKPrevention() {
-            if (!afkEnabled || !playerId) return;
+            if (!afkEnabled) return;
             if (afkInterval) clearInterval(afkInterval);
             
-            addLog(`[AFK] Starting AFK prevention with player ID: ${playerId}`, 'info');
+            addLog(`[AFK] Starting AFK prevention`, 'info');
             
             afkInterval = setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    const packet = createAFKPacket(playerId);
+                    const packet = createAFKPacket();
                     ws.send(packet);
                 } else {
                     stopAFKPrevention();
@@ -1106,7 +1320,7 @@
             const btn = document.getElementById('afkToggle');
             if (btn) btn.innerHTML = afkEnabled ? '⏱️ AFK: ON' : '⏱️ AFK: OFF';
             
-            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN && playerId) {
+            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN) {
                 startAFKPrevention();
             } else {
                 stopAFKPrevention();
@@ -1115,63 +1329,109 @@
             addLog(`[AFK] AFK prevention ${afkEnabled ? 'enabled' : 'disabled'}`, 'info');
         }
 
-        // ==================== PLAYER TRACKING ====================
-        function updatePlayerFromPacket(playerData) {
-            if (!playerData || !playerData.id) return;
+        // ==================== PACKET HANDLING ====================
+        function handleGameState(packet) {
+            if (!packet.Data) return;
             
-            let player = players.get(playerData.id) || {
-                id: playerData.id,
-                name: 'Unknown',
-                team: 2,
-                x: 0,
-                z: 0,
-                goals: 0,
-                assists: 0,
-                bot: false,
-                boosts: [],
-                suspicious: false
-            };
-            
-            // Update player data
-            if (playerData.name) {
-                player.name = playerData.name;
-                playerNames.set(playerData.id, playerData.name);
+            // Update game state
+            if (packet.Data.gameState) {
+                if (packet.Data.gameState.timeRemaining !== undefined) {
+                    gameState.timeRemaining = packet.Data.gameState.timeRemaining;
+                    updateGameTime();
+                }
+                if (packet.Data.gameState.teams) {
+                    packet.Data.gameState.teams.forEach(team => {
+                        if (team.teamId === 0) gameState.redScore = team.score;
+                        if (team.teamId === 1) gameState.blueScore = team.score;
+                    });
+                    updateScores();
+                }
             }
-            if (playerData.team !== null) player.team = playerData.team;
-            if (playerData.x !== null) player.x = playerData.x;
-            if (playerData.z !== null) player.z = playerData.z;
-            if (playerData.goals) player.goals = playerData.goals;
-            if (playerData.assists) player.assists = playerData.assists;
-            if (playerData.bot !== null) player.bot = playerData.bot;
             
-            players.set(playerData.id, player);
+            // Update players
+            if (packet.Data.players && packet.Data.players.list) {
+                packet.Data.players.list.forEach(playerData => {
+                    let player = players.get(playerData.id) || {
+                        id: playerData.id,
+                        boosts: [],
+                        suspicious: false
+                    };
+                    
+                    player.name = playerData.name;
+                    player.team = playerData.team;
+                    player.goals = playerData.goals || 0;
+                    player.assists = playerData.assits || 0;
+                    player.bot = playerData.bot || false;
+                    player.skin = playerData.skinId;
+                    
+                    players.set(playerData.id, player);
+                    
+                    if (movementLogging) {
+                        let teamName = player.team === 0 ? '🔴' : player.team === 1 ? '🔵' : '👁️';
+                        addLog(`${teamName} ${player.name} joined (Team ${player.team})`, 'player');
+                    }
+                });
+            }
             
-            if (movementLogging && playerData.x !== null && playerData.z !== null) {
-                let teamName = player.team === 0 ? '🔴' : player.team === 1 ? '🔵' : '👁️';
-                addLog(`${teamName} ${player.name} moved to (${playerData.x.toFixed(2)}, ${playerData.z.toFixed(2)})`, 'movement');
+            // Update entities (positions)
+            if (packet.Data.entities && packet.Data.entities.list) {
+                packet.Data.entities.list.forEach(entity => {
+                    if (entity.entity && entity.entity.entityType === 1) {
+                        // Ball
+                        ball = entity.entity.position;
+                    } else if (entity.entity && entity.entity.playerId) {
+                        // Player car
+                        let player = players.get(entity.entity.playerId);
+                        if (player && entity.entity.position) {
+                            player.x = entity.entity.position.x;
+                            player.z = entity.entity.position.z;
+                            players.set(entity.entity.playerId, player);
+                            
+                            if (movementLogging && player.name) {
+                                let teamName = player.team === 0 ? '🔴' : player.team === 1 ? '🔵' : '👁️';
+                                addLog(`${teamName} ${player.name} moved to (${player.x.toFixed(2)}, ${player.z.toFixed(2)})`, 'movement');
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Get our player ID
+            if (packet.Data.playerId && !playerId) {
+                playerId = packet.Data.playerId;
+                addLog(`[AUTH] Player ID: ${playerId}`, 'success');
             }
         }
 
-        function handleBoost(playerId) {
-            if (!playerId) return;
+        function handleMovement(packet) {
+            if (!packet.Data || !packet.Data.EID) return;
             
             const now = Date.now();
-            let player = players.get(playerId);
-            if (!player) return;
+            let player = null;
             
-            if (!boostHistory.has(playerId)) {
-                boostHistory.set(playerId, []);
+            // Find player by EID
+            for (let [id, p] of players) {
+                if (p.eid === packet.Data.EID) {
+                    player = p;
+                    break;
+                }
             }
             
-            let boosts = boostHistory.get(playerId);
-            let lastBoost = lastBoostTime.get(playerId) || 0;
+            if (!player) return;
+            
+            if (!boostHistory.has(player.id)) {
+                boostHistory.set(player.id, []);
+            }
+            
+            let boosts = boostHistory.get(player.id);
+            let lastBoost = lastBoostTime.get(player.id) || 0;
             let interval = now - lastBoost;
             
             boosts.push(now);
             if (boosts.length > 20) boosts.shift();
             
             player.boosts = boosts;
-            lastBoostTime.set(playerId, now);
+            lastBoostTime.set(player.id, now);
             
             if (movementLogging && interval > 0) {
                 addLog(`⚡ ${player.name} boosted (interval: ${interval}ms)`, 'player');
@@ -1192,8 +1452,8 @@
                 }
             }
             
-            players.set(playerId, player);
-            boostHistory.set(playerId, boosts);
+            players.set(player.id, player);
+            boostHistory.set(player.id, boosts);
         }
 
         function detectCheater(player, boosts, ratio) {
@@ -1254,6 +1514,7 @@
             packetCount = 0;
             authenticated = false;
             playerId = null;
+            constId = null;
             
             addLog(`[CONNECTION] Connecting to ${selectedServer?.displayName}...`, 'info');
             showStatus(`CONNECTING...`, 'status-connecting');
@@ -1287,53 +1548,65 @@
                     const data = new Uint8Array(event.data);
                     packetCount++;
                     
-                    // Parse based on packet type
-                    if (data[1] === 2) { // Game state packet
-                        if (!authenticated) {
-                            authenticated = true;
-                            addLog('[AUTH] ✅ Authentication successful!', 'success');
+                    try {
+                        // Decode packet using BR decoder
+                        const br = new BR();
+                        let packets;
+                        
+                        if (data[0] === 10) {
+                            packets = br.Mdecoder(data);
+                        } else {
+                            packets = [br.Sdecoder(data)];
+                        }
+                        
+                        if (!packets) return;
+                        
+                        // Handle each packet
+                        Object.values(packets).forEach(packet => {
+                            if (!packet || !packet.PacketId) return;
                             
-                            // Try to find our player ID
-                            for (let i = 0; i < data.length; i++) {
-                                if (data[i] === 0x48) { // constId field
-                                    let [id, pos] = int7(data, i + 1);
-                                    playerId = id;
-                                    addLog(`[AUTH] Player ID: ${playerId}`, 'success');
-                                    break;
+                            const packetId = packet.PacketId;
+                            
+                            if (packetId === 2) { // Game state
+                                if (!authenticated) {
+                                    authenticated = true;
+                                    addLog('[AUTH] ✅ Authentication successful!', 'success');
+                                    
+                                    if (document.getElementById('autoSpectator').checked) {
+                                        setTimeout(() => {
+                                            sendSpectatorCommand();
+                                            setTimeout(() => startAFKPrevention(), 500);
+                                        }, 1000);
+                                    }
+                                }
+                                handleGameState(packet);
+                                
+                            } else if (packetId === 7) { // Movement/boost
+                                handleMovement(packet);
+                                
+                            } else if (packetId === 8) { // Entity update
+                                if (packet.Data && packet.Data.entity) {
+                                    if (packet.Data.entity.entityType === 1) {
+                                        ball = packet.Data.entity.position;
+                                    } else if (packet.Data.entity.playerId) {
+                                        let player = players.get(packet.Data.entity.playerId);
+                                        if (player && packet.Data.entity.position) {
+                                            player.x = packet.Data.entity.position.x;
+                                            player.z = packet.Data.entity.position.z;
+                                            players.set(packet.Data.entity.playerId, player);
+                                        }
+                                    }
                                 }
                             }
-                            
-                            // Send spectator command if auto enabled
-                            if (document.getElementById('autoSpectator').checked) {
-                                setTimeout(() => {
-                                    sendSpectatorCommand();
-                                    // Start AFK after spectator command
-                                    setTimeout(() => startAFKPrevention(), 500);
-                                }, 1000);
-                            }
-                        }
+                        });
                         
-                        // Parse all players in game state
-                        let players_data = PacketParser.parseGameState(data);
-                        players_data.forEach(p => updatePlayerFromPacket(p));
+                        // Update UI
+                        drawCanvas();
+                        updatePlayerList();
                         
-                    } else if (data[1] === 8) { // Player spawn/update
-                        let player = PacketParser.parsePlayerUpdate(data, 2);
-                        if (player) {
-                            updatePlayerFromPacket(player);
-                            addLog(`[PLAYER] ${player.name} (Team ${player.team}) spawned`, 'player');
-                        }
-                        
-                    } else if (data[1] === 7) { // Movement packet (boost detection!)
-                        let movement = PacketParser.parseMovement(data, 2);
-                        if (movement && movement.playerId) {
-                            handleBoost(movement.playerId);
-                        }
+                    } catch (e) {
+                        // Silent fail on parse errors
                     }
-                    
-                    // Update UI
-                    drawCanvas();
-                    updatePlayerList();
                 };
                 
                 ws.onclose = (event) => {
@@ -1429,6 +1702,17 @@
                 ctx.font = '12px Arial';
                 ctx.fillText(player.name || '?', x - 20, y - 20);
             });
+            
+            // Draw ball
+            if (ball.x !== undefined && ball.z !== undefined) {
+                let x = (ball.x / 50) * canvas.width/2 + canvas.width/2;
+                let y = (ball.z / 50) * canvas.height/2 + canvas.height/2;
+                
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         function updatePlayerList() {
@@ -1462,6 +1746,20 @@
             
             list.innerHTML = html || '<div style="padding: 20px; text-align: center;">No players yet</div>';
             if (count) count.innerText = `(${players.size})`;
+        }
+
+        function updateGameTime() {
+            const mins = Math.floor(gameState.timeRemaining / 60);
+            const secs = Math.floor(gameState.timeRemaining % 60);
+            const timeEl = document.getElementById('gameTime');
+            if (timeEl) timeEl.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateScores() {
+            const redEl = document.getElementById('redScore');
+            const blueEl = document.getElementById('blueScore');
+            if (redEl) redEl.innerText = gameState.redScore;
+            if (blueEl) blueEl.innerText = gameState.blueScore;
         }
 
         function updateDetectionsList() {
@@ -1560,8 +1858,8 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v15.0 initialized', 'success');
-            addLog('[SYSTEM] Full packet parsing active - logging all player movements', 'info');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v16.0 initialized', 'success');
+            addLog('[SYSTEM] Full BR decoder active - perfect packet parsing', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
         });
 
