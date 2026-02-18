@@ -477,7 +477,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v8.0</h1>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v9.0</h1>
         <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Exact Packet Replication</div>
         
         <div class="tournament-banner">
@@ -610,7 +610,7 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v8.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            TOURNAMENT ANTI-CHEAT SYSTEM v9.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
             © 2024 Tournament Anti-Cheat • Password: rodshot (configurable)
         </div>
     </div>
@@ -646,83 +646,68 @@
             }
         };
 
-        // ==================== EXACT PACKET BUILDER ====================
-        function buildExactAuthPacket(username, uid, password) {
-            // From working hex: 080112380a0a43617375616c20323932121c786371325a526369495453764e41743744584e5050453749716c763218e6062a07726f6473686f743801
+        // ==================== EXACT PACKET FROM WORKING HEX ====================
+        // Working packet: 080112380a0a43617375616c20323932121c786371325a526369495453764e41743744584e5050453749716c763218e6062a07726f6473686f743801
+        
+        function createAuthPacket(username, uid, password) {
+            // Convert strings to byte arrays
+            let usernameBytes = [];
+            for (let i = 0; i < username.length; i++) {
+                usernameBytes.push(username.charCodeAt(i));
+            }
             
-            let usernameBytes = new TextEncoder().encode(username);
-            let uidBytes = new TextEncoder().encode(uid);
-            let pwdBytes = new TextEncoder().encode(password);
+            let uidBytes = [];
+            for (let i = 0; i < uid.length; i++) {
+                uidBytes.push(uid.charCodeAt(i));
+            }
             
-            // Build exactly like the working packet
+            let pwdBytes = [];
+            for (let i = 0; i < password.length; i++) {
+                pwdBytes.push(password.charCodeAt(i));
+            }
+            
+            // Build packet exactly like the working hex
             let packet = [
-                0x0a, // multiplex header
                 0x08, // field 8 - PacketId
                 0x01, // PacketId = 1
                 0x12, // field 18 - Data
+                0x38, // data length (56 bytes) - fixed!
+                0x0a, // field 10 - name
+                usernameBytes.length, // username length
+                ...usernameBytes,
+                0x12, // field 18 - uid
+                uidBytes.length, // uid length (28)
+                ...uidBytes,
+                0x18, // field 24 - skinId
+                0xe6, // 230
+                0x2a, // field 42 - authenticationMethod
+                pwdBytes.length, // password length
+                ...pwdBytes,
+                0x38, // field 56
+                0x01  // value 1
             ];
-            
-            // Calculate data length
-            let dataLength = 
-                2 + usernameBytes.length + // field 10 + length + string
-                2 + uidBytes.length +      // field 18 + length + string
-                2 +                        // field 24 + skinId
-                2 + pwdBytes.length +      // field 42 + length + password
-                0; // No extra field
-            
-            packet.push(dataLength);
-            
-            // Field 10: name
-            packet.push(0x0a);
-            packet.push(usernameBytes.length);
-            packet.push(...usernameBytes);
-            
-            // Field 18: uid
-            packet.push(0x12);
-            packet.push(uidBytes.length);
-            packet.push(...uidBytes);
-            
-            // Field 24: skinId (0x18)
-            packet.push(0x18);
-            packet.push(0xe6); // 230
-            
-            // Field 42: authenticationMethod (0x2a)
-            packet.push(0x2a);
-            packet.push(pwdBytes.length);
-            packet.push(...pwdBytes);
-            
-            // Final field 56: value 1
-            packet.push(0x38);
-            packet.push(0x01);
             
             return new Uint8Array(packet);
         }
 
-        function buildChatPacket(message) {
-            // Simple chat packet structure
-            let msgBytes = new TextEncoder().encode(message);
+        function createChatPacket(message) {
+            let msgBytes = [];
+            for (let i = 0; i < message.length; i++) {
+                msgBytes.push(message.charCodeAt(i));
+            }
             
+            // Simple chat packet
             let packet = [
-                0x0a, // multiplex header
                 0x08, // field 8 - PacketId
                 0x05, // PacketId = 5 (chat)
                 0x12, // field 18 - Data
+                0x0c, // data length (12 bytes)
+                0x08, // field 8 - playerId
+                0x00, // playerId = 0
+                0x12, // field 18 - message
+                msgBytes.length,
+                ...msgBytes
             ];
-            
-            // Build data dict
-            let dataBytes = [];
-            
-            // Field 8: playerId = 0
-            dataBytes.push(0x08);
-            dataBytes.push(0x00);
-            
-            // Field 18: message
-            dataBytes.push(0x12);
-            dataBytes.push(msgBytes.length);
-            dataBytes.push(...msgBytes);
-            
-            packet.push(dataBytes.length);
-            packet.push(...dataBytes);
             
             return new Uint8Array(packet);
         }
@@ -852,7 +837,7 @@
         }
 
         function generateUID() {
-            // Working packet UID is 28 bytes, not 32
+            // Working packet UID is 28 bytes
             const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let result = '';
             for (let i = 0; i < 28; i++) {
@@ -875,13 +860,12 @@
                 
                 addLog(`[AUTH] Username: ${username}`, 'info');
                 addLog(`[AUTH] UID: ${uid}`, 'info');
-                addLog(`[AUTH] Password: ${password}`, 'info');
                 
-                const packet = buildExactAuthPacket(username, uid, password);
+                const packet = createAuthPacket(username, uid, password);
                 
                 addLog(`[AUTH] Packet size: ${packet.length} bytes`, 'info');
                 
-                // Log full hex for debugging
+                // Log full hex
                 const hexFull = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
                 addLog(`[AUTH] Packet hex: ${hexFull}`, 'info');
                 
@@ -902,7 +886,7 @@
             document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
             
             try {
-                const packet = buildChatPacket('/team spectator');
+                const packet = createChatPacket('/team spectator');
                 addLog(`[SPECTATOR] Packet size: ${packet.length} bytes`, 'info');
                 ws.send(packet);
                 
@@ -1035,12 +1019,7 @@
             }
         }
 
-        // ==================== GAME STATE UPDATES ====================
-        function handleGamePacket(packet) {
-            // This would parse the game packets
-            // For now, just log that we received it
-        }
-
+        // ==================== UI UPDATES ====================
         function drawCanvas() {
             const canvas = document.getElementById('gameCanvas');
             if (!canvas) return;
@@ -1201,7 +1180,7 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v8.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v9.0 initialized', 'success');
             addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
         });
