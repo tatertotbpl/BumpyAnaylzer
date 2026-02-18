@@ -659,15 +659,17 @@
             writeBytes(arr) {
                 this.bytes.push(...arr);
             }
-            
             writeVarInt(num) {
-                while (num >= 128) {
-                    this.bytes.push((num & 127) | 128);
-                    num = Math.floor(num / 128);
-                }
-                this.bytes.push(num & 127);
-            }
-            
+    // This matches the game's encoding
+    let bytes = [];
+    while (num >= 128) {
+        bytes.push((num & 127) | 128);
+        num = num >> 7;
+    }
+    bytes.push(num);
+    return bytes;
+}
+        
             writeString(str) {
                 let strBytes = new TextEncoder().encode(str);
                 this.writeVarInt(strBytes.length);
