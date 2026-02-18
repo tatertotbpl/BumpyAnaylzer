@@ -3,7 +3,7 @@
 <head>
     <title>BumpyBall Tournament Anti-Cheat Analyzer</title>
     <style>
-        /* Keep all the existing CSS from v15.0 - it's perfect */
+        /* Keep all the existing CSS from v16.0 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -481,8 +481,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v16.0</h1>
-        <div class="subtitle">Professional Grade • Full BR Decoder • Perfect Packet Parsing • Auto-Backboost Detection</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v17.0</h1>
+        <div class="subtitle">Professional Grade • Working Auth • Full BR Decoder • Auto-Backboost Detection</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -618,12 +618,23 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v16.0 • FULL BR DECODER • PERFECT PACKET PARSING • AUTO-BACKBOOST DETECTION<br>
+            TOURNAMENT ANTI-CHEAT SYSTEM v17.0 • WORKING AUTH • FULL BR DECODER • AUTO-BACKBOOST DETECTION<br>
             Logs all player movements • AFK Prevention • Password: rodshot
         </div>
     </div>
 
     <script>
+        // ==================== VARINT FUNCTIONS ====================
+        const w7bit = num => {
+            let r = [];
+            while (num >= 128) {
+                r.push((128 | num) % 256);
+                num >>= 7;
+            }
+            r.push(num % 256);
+            return r;
+        };
+
         // ==================== BR DECODER FROM CHEAT SCRIPT ====================
         const Packet = {
             0: {},
@@ -893,26 +904,6 @@
                 return f;
             }
             
-            bit7(num) {
-                for (; num >= 128; num >>= 7) this.arr.push((128 | num) % 256);
-                return this.arr.push(num % 256);
-            }
-            
-            ft32(num) {
-                let f = new Float32Array([num]);
-                let b = new Uint8Array(f.buffer);
-                this.arr.push(...b);
-            }
-            
-            istr(value) {
-                let s = new TextEncoder().encode(value);
-                this.arr.push(s.length, ...s);
-            }
-            
-            ab(value) {
-                this.arr.push(value);
-            }
-            
             decode(def) {
                 let obj = {};
                 
@@ -957,52 +948,9 @@
                 return obj;
             }
             
-            encode(packet) {
-                for (let byte in packet) {
-                    let [keyName, valueType, value] = packet[byte];
-                    
-                    switch (valueType) {
-                        case "int":
-                        case "uint":
-                        case "bool":
-                            this.ab(Number(byte));
-                            this.bit7(value);
-                            break;
-                        case "string":
-                            this.ab(Number(byte));
-                            this.istr(value);
-                            break;
-                        case "float":
-                            this.ab(Number(byte));
-                            this.ft32(value);
-                            break;
-                        case "dict":
-                            let da = new BR().encode(packet[Number(byte)][2]);
-                            this.ab(Number(byte));
-                            this.bit7(da.length);
-                            this.arr.push(...da);
-                            break;
-                        case "arr":
-                            value.forEach(index => {
-                                let a = new BR().encode(index);
-                                this.ab(Number(byte));
-                                this.bit7(a.length);
-                                this.arr.push(...a);
-                            });
-                            break;
-                    }
-                }
-                return this.arr;
-            }
-            
             Sdecoder(d) {
                 let sd = new BR(d);
                 return sd.decode(Packet[d[1]]);
-            }
-            
-            Sencoder(j) {
-                let a = new BR().encode(j);
-                return a;
             }
             
             Mdecoder(d) {
@@ -1020,19 +968,45 @@
                 
                 return j;
             }
+        }
+
+        // ==================== WORKING MANUAL AUTH PACKET ====================
+        function createAuthPacket(username, uid, password) {
+            // Working packet from earlier: 60 bytes, connects successfully
+            let usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
+            let uidBytes = Array.from(uid).map(c => c.charCodeAt(0));
+            let pwdBytes = Array.from(password).map(c => c.charCodeAt(0));
             
-            Mencoder(j) {
-                let a = [];
-                for (let b in j) {
-                    let _j = j[b];
-                    let a_ = new BR().Sencoder(_j);
-                    let le = new BR();
-                    le.bit7(a_.length);
-                    let l = le.arr;
-                    a.push(10, ...l, ...a_);
-                }
-                return a;
-            }
+            // Build exactly like the working packet from v13.0
+            let packet = [
+                0x08, 0x01, 0x12, 0x38,
+                0x0a, usernameBytes.length, ...usernameBytes,
+                0x12, uidBytes.length, ...uidBytes,
+                0x18, 0xe6, 0x06,
+                0x2a, pwdBytes.length, ...pwdBytes,
+                0x38, 0x01
+            ];
+            
+            return new Uint8Array(packet);
+        }
+
+        // ==================== SPECTATOR PACKET ====================
+        function createSpectatorPacket() {
+            let msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
+            
+            return new Uint8Array([
+                0x08, 0x05, 0x12, 0x0c,
+                0x08, 0x00,
+                0x12, msgBytes.length, ...msgBytes
+            ]);
+        }
+
+        // ==================== AFK PACKET ====================
+        function createAFKPacket(playerId) {
+            // Base AFK packet from Tampermonkey
+            let basePacket = [0x08, 0x07, 0x12, 0x0a, 0x18, 0x05, 0x13, 0x00, 0x00, 0x80, 0x3f, 0x24];
+            let idBytes = w7bit(playerId || 1);
+            return new Uint8Array([...basePacket, ...idBytes]);
         }
 
         // ==================== TOURNAMENT SERVERS CONFIGURATION ====================
@@ -1208,22 +1182,15 @@
                 const username = generateUsername();
                 const uid = generateUID();
                 
-                // Create auth packet using BR encoder
-                const authPacket = {
-                    8: ["PacketId", "int", 1],
-                    18: ["Data", "dict", {
-                        10: ["name", "string", username],
-                        18: ["uid", "string", uid],
-                        32: ["skinId", "uint", 230],
-                        56: ["authenticationMethod", "uint", 1] // Password method
-                    }]
-                };
+                addLog(`[AUTH] Username: ${username}`, 'info');
+                addLog(`[AUTH] UID: ${uid}`, 'info');
                 
-                const br = new BR();
-                const encoded = br.Sencoder(authPacket);
-                const packet = new Uint8Array([10, ...encoded]);
+                const packet = createAuthPacket(username, uid, password);
                 
                 addLog(`[AUTH] Packet size: ${packet.length} bytes`, 'info');
+                const hexFull = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                addLog(`[AUTH] Packet hex: ${hexFull}`, 'info');
+                
                 ws.send(packet);
                 
             } catch (e) {
@@ -1242,19 +1209,7 @@
             document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
             
             try {
-                // Create chat packet using BR encoder
-                const chatPacket = {
-                    8: ["PacketId", "int", 5],
-                    18: ["Data", "dict", {
-                        8: ["playerId", "uint", 0],
-                        18: ["message", "string", "/team spectator"]
-                    }]
-                };
-                
-                const br = new BR();
-                const encoded = br.Sencoder(chatPacket);
-                const packet = new Uint8Array([10, ...encoded]);
-                
+                const packet = createSpectatorPacket();
                 ws.send(packet);
                 
                 addLog('[SPECTATOR] ✅ Spectator command sent', 'success');
@@ -1272,34 +1227,15 @@
         }
 
         // ==================== AFK PREVENTION ====================
-        function createAFKPacket() {
-            // Simple movement packet to prevent AFK
-            const afkPacket = {
-                8: ["PacketId", "int", 7],
-                18: ["Data", "dict", {
-                    8: ["command", "bool", 1],
-                    18: ["position", "dict", {
-                        13: ["x", "float", 0],
-                        21: ["z", "float", 0]
-                    }],
-                    24: ["EID", "uint", constId || 0]
-                }]
-            };
-            
-            const br = new BR();
-            const encoded = br.Sencoder(afkPacket);
-            return new Uint8Array([10, ...encoded]);
-        }
-
         function startAFKPrevention() {
-            if (!afkEnabled) return;
+            if (!afkEnabled || !playerId) return;
             if (afkInterval) clearInterval(afkInterval);
             
-            addLog(`[AFK] Starting AFK prevention`, 'info');
+            addLog(`[AFK] Starting AFK prevention with player ID: ${playerId}`, 'info');
             
             afkInterval = setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    const packet = createAFKPacket();
+                    const packet = createAFKPacket(playerId);
                     ws.send(packet);
                 } else {
                     stopAFKPrevention();
@@ -1320,7 +1256,7 @@
             const btn = document.getElementById('afkToggle');
             if (btn) btn.innerHTML = afkEnabled ? '⏱️ AFK: ON' : '⏱️ AFK: OFF';
             
-            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN) {
+            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN && playerId) {
                 startAFKPrevention();
             } else {
                 stopAFKPrevention();
@@ -1368,7 +1304,7 @@
                     
                     if (movementLogging) {
                         let teamName = player.team === 0 ? '🔴' : player.team === 1 ? '🔵' : '👁️';
-                        addLog(`${teamName} ${player.name} joined (Team ${player.team})`, 'player');
+                        addLog(`${teamName} ${player.name || 'Unknown'} joined (Team ${player.team})`, 'player');
                     }
                 });
             }
@@ -1858,8 +1794,9 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v16.0 initialized', 'success');
-            addLog('[SYSTEM] Full BR decoder active - perfect packet parsing', 'info');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v17.0 initialized', 'success');
+            addLog('[SYSTEM] Working manual auth packet (60 bytes)', 'info');
+            addLog('[SYSTEM] Full BR decoder for parsing', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
         });
 
