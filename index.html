@@ -133,16 +133,6 @@
             color: #4ade80;
             box-shadow: 0 0 12px #4ade80;
         }
-        .status-offline { 
-            background: #ef4444; 
-            color: #ef4444;
-            box-shadow: 0 0 12px #ef4444;
-        }
-        .status-checking { 
-            background: #fbbf24; 
-            color: #fbbf24;
-            box-shadow: 0 0 12px #fbbf24;
-        }
         
         .spectator-controls {
             background: #16213e;
@@ -487,11 +477,11 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v2.0</h1>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v3.0</h1>
         <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Packet Logging</div>
         
         <div class="tournament-banner">
-            ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD PROTECTED
+            ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD REQUIRED
         </div>
         
         <!-- Spectator Controls -->
@@ -542,7 +532,7 @@
                 <input type="password" 
                        id="serverPassword" 
                        class="password-input" 
-                       placeholder="Enter server password (required for tournament servers)" 
+                       placeholder="Enter server password (required)" 
                        autocomplete="off">
                 <div style="color: #fbbf24; font-size: 12px; margin-top: 5px;">
                     ⚠️ Tournament servers require password authentication
@@ -552,7 +542,6 @@
             <div class="button-group">
                 <button onclick="connectToSelected()" id="connectBtn" disabled>🚀 CONNECT TO SERVER</button>
                 <button onclick="disconnect()" id="disconnectBtn" class="secondary" disabled>🔌 DISCONNECT</button>
-                <button onclick="testPing()" id="pingBtn" class="secondary">📡 TEST PINGS</button>
                 <button onclick="clearLogs()" id="clearLogsBtn" class="secondary">🗑 CLEAR LOGS</button>
             </div>
             
@@ -620,7 +609,7 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v2.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            TOURNAMENT ANTI-CHEAT SYSTEM v3.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
             © 2024 Tournament Anti-Cheat • All detections are logged locally
         </div>
     </div>
@@ -633,12 +622,6 @@
                 location: 'New York, USA',
                 flag: '🇺🇸',
                 color: '#ef4444',
-                pings: [
-                    'https://community-01.usemapsettings.com:8086/ping',
-                    'https://community-01.usemapsettings.com:8087/ping',
-                    'https://community-01.usemapsettings.com:8088/ping',
-                    'https://community-01.usemapsettings.com:8089/ping'
-                ],
                 websockets: [
                     'wss://community-01.usemapsettings.com:8086',
                     'wss://community-01.usemapsettings.com:8087',
@@ -652,12 +635,6 @@
                 location: 'Frankfurt, Germany',
                 flag: '🇩🇪',
                 color: '#3b82f6',
-                pings: [
-                    'https://community-02.usemapsettings.com:8086/ping',
-                    'https://community-02.usemapsettings.com:8087/ping',
-                    'https://community-02.usemapsettings.com:8088/ping',
-                    'https://community-02.usemapsettings.com:8089/ping'
-                ],
                 websockets: [
                     'wss://community-02.usemapsettings.com:8086',
                     'wss://community-02.usemapsettings.com:8087',
@@ -705,7 +682,6 @@
                 return new Float32Array(new Uint8Array(this.rbs(4)).buffer)[0];
             }
             
-            // Complete packet definitions from the decoder
             static Packet = {
                 1: {
                     8: ["PacketId", "int"],
@@ -828,14 +804,11 @@
                 let packetId = data[1];
                 let packetDef = BR.Packet[packetId];
                 if (!packetDef) {
-                    addLog(`[WARNING] Unknown packet type: ${packetId}`, 'warning');
                     return null;
                 }
                 
                 br.i = 2;
-                let decoded = br.decode(packetDef);
-                addLog(`[PACKET] Received packet ID ${packetId} (${Object.keys(decoded?.Data || {}).length} fields)`, 'info');
-                return decoded;
+                return br.decode(packetDef);
             }
             
             decodeMultiPacket(data) {
@@ -853,7 +826,6 @@
                         break;
                     }
                 }
-                addLog(`[PACKET] Received ${packets.length} multiplexed packets`, 'info');
                 return packets;
             }
             
@@ -896,7 +868,6 @@
                 return obj;
             }
             
-            // Encoder methods (for sending packets)
             bit7(num) {
                 let bytes = [];
                 for(; num >= 128; num >>= 7) bytes.push((128 | num) % 256);
@@ -942,22 +913,19 @@
         let ws = null;
         let players = new Map();
         let ball = { x: 0, z: 0 };
-        let entities = new Map(); // entityId -> playerId
+        let entities = new Map();
         let gameState = {
             timeRemaining: 300,
             redScore: 0,
-            blueScore: 0,
-            gameState: 0
+            blueScore: 0
         };
         
-        // Detection State
         let boostHistory = new Map();
         let detections = JSON.parse(localStorage.getItem('tournamentDetections') || '[]');
         let currentRecording = null;
         let recordingStartTime = null;
         let recordingInterval = null;
         let selectedServer = null;
-        let pingIntervals = [];
         let logEntries = [];
         let packetCount = 0;
 
@@ -991,7 +959,7 @@
             addLog('Logs cleared by user', 'warning');
         }
 
-    // ==================== SERVER MANAGEMENT ====================
+        // ==================== SERVER MANAGEMENT ====================
         function initServers() {
             addLog('Initializing tournament server list...', 'info');
             
@@ -1003,11 +971,11 @@
                     nyDiv.innerHTML += `
                         <div class="server-card" onclick="selectServer('ny', ${index})" id="ny-card-${index}">
                             <div>
-                                <span class="server-status status-checking" id="ny-status-${index}"></span>
+                                <span class="server-status status-online"></span>
                                 <span class="server-port">${TOURNAMENT_SERVERS.ny.displayNames[index]}</span>
                             </div>
                             <div>
-                                <span class="server-ping" id="ny-ping-${index}">checking...</span>
+                                <span class="server-ping">ready</span>
                             </div>
                         </div>
                     `;
@@ -1022,77 +990,18 @@
                     fraDiv.innerHTML += `
                         <div class="server-card" onclick="selectServer('fra', ${index})" id="fra-card-${index}">
                             <div>
-                                <span class="server-status status-checking" id="fra-status-${index}"></span>
+                                <span class="server-status status-online"></span>
                                 <span class="server-port">${TOURNAMENT_SERVERS.fra.displayNames[index]}</span>
                             </div>
                             <div>
-                                <span class="server-ping" id="fra-ping-${index}">checking...</span>
+                                <span class="server-ping">ready</span>
                             </div>
                         </div>
                     `;
                 });
             }
             
-            addLog('Server grid initialized, starting ping checks...', 'success');
-            pingAllServers();
-        }
-
-        async function pingAllServers() {
-            pingIntervals.forEach(clearInterval);
-            pingIntervals = [];
-            
-            await pingServer('ny', 0);
-            await pingServer('ny', 1);
-            await pingServer('ny', 2);
-            await pingServer('ny', 3);
-            await pingServer('fra', 0);
-            await pingServer('fra', 1);
-            await pingServer('fra', 2);
-            await pingServer('fra', 3);
-            
-            pingIntervals.push(setInterval(() => {
-                pingServer('ny', 0);
-                pingServer('ny', 1);
-                pingServer('ny', 2);
-                pingServer('ny', 3);
-                pingServer('fra', 0);
-                pingServer('fra', 1);
-                pingServer('fra', 2);
-                pingServer('fra', 3);
-            }, 30000));
-        }
-
-        async function pingServer(region, index) {
-            const server = TOURNAMENT_SERVERS[region];
-            if (!server) return;
-            
-            const pingUrl = server.pings[index];
-            const statusEl = document.getElementById(`${region}-status-${index}`);
-            const pingEl = document.getElementById(`${region}-ping-${index}`);
-            
-            if (!statusEl || !pingEl) return;
-            
-            statusEl.className = 'server-status status-checking';
-            pingEl.innerText = 'pinging...';
-            
-            const start = Date.now();
-            
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000);
-                
-                await fetch(pingUrl, { mode: 'no-cors', signal: controller.signal });
-                clearTimeout(timeoutId);
-                
-                const ping = Date.now() - start;
-                statusEl.className = 'server-status status-online';
-                pingEl.innerText = `${ping}ms`;
-                addLog(`[PING] ${server.displayNames[index]} - ${ping}ms`, 'success');
-            } catch (e) {
-                statusEl.className = 'server-status status-online';
-                pingEl.innerText = 'online';
-                addLog(`[PING] ${server.displayNames[index]} - online (CORS limited)`, 'info');
-            }
+            addLog('Server grid initialized', 'success');
         }
 
         function selectServer(region, index) {
@@ -1119,11 +1028,6 @@
             addLog(`[SERVER] Selected ${selectedServer.fullName}`, 'success');
         }
 
-        function testPing() {
-            addLog('[SYSTEM] Manual ping test initiated...', 'info');
-            pingAllServers();
-        }
-        
         // ==================== AUTHENTICATION ====================
         function sendAuthentication(password) {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -1134,7 +1038,6 @@
             addLog('[AUTH] Sending authentication packet...', 'info');
             
             try {
-                // Create authentication packet (Packet ID 1)
                 const authPacket = {
                     8: ["PacketId", "int", 1],
                     18: ["Data", "dict", {
@@ -1148,7 +1051,7 @@
                 
                 const br = new BR();
                 const encoded = br.encode(authPacket);
-                const packet = new Uint8Array([10, ...encoded]); // Add multiplex header
+                const packet = new Uint8Array([10, ...encoded]);
                 
                 ws.send(packet);
                 addLog('[AUTH] Authentication packet sent', 'success');
@@ -1174,10 +1077,9 @@
             
             const password = document.getElementById('serverPassword').value;
             if (!password) {
-                addLog('[WARNING] No password provided - tournament servers require password', 'warning');
-                if (!confirm('Tournament servers require a password. Continue without password?')) {
-                    return;
-                }
+                addLog('[ERROR] Password required for tournament servers', 'error');
+                alert('Password is required for tournament servers');
+                return;
             }
             
             connect(selectedServer.url, password);
@@ -1189,7 +1091,6 @@
                 ws = null;
             }
             
-            // Reset game state
             players.clear();
             entities.clear();
             boostHistory.clear();
@@ -1219,14 +1120,12 @@
                     document.getElementById('disconnectBtn').disabled = false;
                     document.getElementById('gameView').style.display = 'block';
                     
-                    // Send authentication FIRST
-                    if (password) {
-                        setTimeout(() => sendAuthentication(password), 500);
-                    }
+                    // Send authentication immediately
+                    sendAuthentication(password);
                     
-                    // Send spectator command if enabled
+                    // Send spectator command after auth
                     if (document.getElementById('autoSpectator').checked) {
-                        setTimeout(sendSpectatorCommand, 2000);
+                        setTimeout(sendSpectatorCommand, 1000);
                     }
                     
                     startRecording();
@@ -1236,8 +1135,8 @@
                     const data = new Uint8Array(event.data);
                     packetCount++;
                     
-                    if (packetCount % 10 === 0) {
-                        addLog(`[STATS] Received ${packetCount} packets so far`, 'info');
+                    if (packetCount === 1) {
+                        addLog(`[DEBUG] First packet received - ${data.length} bytes`, 'info');
                     }
                     
                     const br = new BR();
@@ -1254,18 +1153,32 @@
                 
                 ws.onclose = (event) => {
                     clearTimeout(connectionTimeout);
-                    addLog(`[CONNECTION] Disconnected - Code: ${event.code} Reason: ${event.reason || 'No reason'}`, 'warning');
-                    showStatus(`DISCONNECTED (CODE: ${event.code})`, 'status-error');
+                    
+                    let reason = 'Unknown';
+                    if (event.code === 1000) reason = 'Normal closure';
+                    else if (event.code === 1001) reason = 'Going away';
+                    else if (event.code === 1002) reason = 'Protocol error';
+                    else if (event.code === 1003) reason = 'Unsupported data';
+                    else if (event.code === 1005) reason = 'No status received';
+                    else if (event.code === 1006) reason = 'Abnormal closure - Wrong password or server offline';
+                    else if (event.code === 1007) reason = 'Invalid frame payload';
+                    else if (event.code === 1008) reason = 'Policy violation';
+                    else if (event.code === 1009) reason = 'Message too big';
+                    else if (event.code === 1010) reason = 'Missing extension';
+                    else if (event.code === 1011) reason = 'Internal error';
+                    
+                    addLog(`[CONNECTION] Disconnected - ${reason}`, 'warning');
+                    showStatus(`DISCONNECTED - ${reason}`, 'status-error');
                     
                     document.getElementById('connectBtn').disabled = false;
                     document.getElementById('disconnectBtn').disabled = true;
                     stopRecording();
                 };
                 
-                ws.onerror = (error) => {
+                ws.onerror = () => {
                     clearTimeout(connectionTimeout);
-                    addLog('[ERROR] WebSocket connection failed - Check server and password', 'error');
-                    showStatus('CONNECTION FAILED', 'status-error');
+                    addLog('[ERROR] Connection failed - Check password', 'error');
+                    showStatus('CONNECTION FAILED - WRONG PASSWORD?', 'status-error');
                 };
                 
             } catch (error) {
@@ -1276,7 +1189,7 @@
 
         function disconnect() {
             if (ws) {
-                addLog('[CONNECTION] Manual disconnect initiated', 'warning');
+                addLog('[CONNECTION] Manual disconnect', 'warning');
                 ws.close();
                 ws = null;
             }
@@ -1290,14 +1203,10 @@
             const data = packet.Data;
             
             switch(packetId) {
-                case 2: // Initial game state
-                    addLog('[GAME] Received initial game state', 'success');
-                    
+                case 2:
                     if (data?.players?.list) {
-                        addLog(`[PLAYERS] Loading ${data.players.list.length} players`, 'info');
                         data.players.list.forEach(player => updatePlayer(player));
                     }
-                    
                     if (data?.gameState) {
                         if (data.gameState.timeRemaining !== undefined) {
                             gameState.timeRemaining = data.gameState.timeRemaining;
@@ -1309,12 +1218,10 @@
                             });
                         }
                     }
-                    
                     if (data?.entities?.list) {
                         data.entities.list.forEach(entity => {
                             if (entity?.entity?.entityType === 1) {
                                 ball = entity.entity.position;
-                                addLog('[BALL] Ball position updated', 'info');
                             } else if (entity?.entity?.playerId) {
                                 entities.set(entity.id, entity.entity.playerId);
                             }
@@ -1322,19 +1229,13 @@
                     }
                     break;
                     
-                case 5: // Chat message
-                    if (data?.message) {
-                        addLog(`[CHAT] ${data.playerId}: ${data.message}`, 'info');
-                    }
-                    break;
-                    
-                case 7: // Movement command (BOOST DETECTION!)
+                case 7:
                     if (data?.command && data?.EID) {
                         handleBoost(data.EID);
                     }
                     break;
                     
-                case 8: // Entity update
+                case 8:
                     if (data?.entity) {
                         if (data.entity.entityType === 1) {
                             ball = data.entity.position;
@@ -1344,7 +1245,7 @@
                     }
                     break;
                     
-                case 12: // Game state update
+                case 12:
                     if (data?.timeRemaining !== undefined) {
                         gameState.timeRemaining = data.timeRemaining;
                         updateGameTime();
@@ -1357,23 +1258,8 @@
                         updateScores();
                     }
                     break;
-                    
-                case 13: // Team change
-                    if (data?.id && data?.team !== undefined) {
-                        let player = players.get(data.id);
-                        if (player) {
-                            addLog(`[TEAM] ${player.name} switched to team ${data.team}`, 'info');
-                            player.team = data.team;
-                            players.set(data.id, player);
-                        }
-                    }
-                    break;
-                    
-                default:
-                    addLog(`[PACKET] Unhandled packet type ${packetId}`, 'warning');
             }
             
-            // Record packet
             if (currentRecording) {
                 currentRecording.packets.push({
                     timestamp: Date.now() - recordingStartTime,
@@ -1398,15 +1284,9 @@
             player.name = playerData.name || 'Unknown';
             player.team = playerData.team;
             player.goals = playerData.goals || 0;
-            player.assists = playerData.assits || 0;
             player.bot = playerData.bot || false;
-            player.skin = playerData.skinId;
             
             players.set(playerData.id, player);
-            
-            if (players.size % 5 === 0) {
-                addLog(`[PLAYERS] Total players: ${players.size}`, 'info');
-            }
         }
 
         function updatePlayerPosition(playerId, position) {
@@ -1420,7 +1300,6 @@
             }
         }
 
-        // ==================== BOOST DETECTION ====================
         function handleBoost(entityId) {
             const playerId = entities.get(entityId);
             if (!playerId) return;
@@ -1441,7 +1320,6 @@
             
             player.boosts = boosts;
             
-            // DETECTION LOGIC: Look for 130ms pattern
             if (boosts.length >= 10) {
                 let suspicious = 0;
                 for (let i = 1; i < boosts.length; i++) {
@@ -1452,9 +1330,8 @@
                 }
                 
                 let ratio = suspicious / boosts.length;
-                if (ratio > 0.6) { // 60% of boosts match the cheat pattern
+                if (ratio > 0.6) {
                     player.suspicious = true;
-                    addLog(`[⚠️ DETECTION] Player ${player.name} - ${(ratio*100).toFixed(1)}% match to 130ms pattern`, 'warning');
                     detectCheater(player, boosts, ratio);
                 }
             }
@@ -1478,7 +1355,6 @@
                     team: player.team,
                     server: selectedServer?.displayName || 'Unknown',
                     confidence: Math.min(100, (ratio * 100)),
-                    pattern: boostPattern.slice(-10),
                     boostCount: boostPattern.length,
                     matchRatio: ratio
                 };
@@ -1492,14 +1368,12 @@
                 
                 if (Notification.permission === 'granted') {
                     new Notification('🚨 AUTO-BACKBOOST DETECTED!', {
-                        body: `${player.name} on ${selectedServer?.displayName} - ${detection.confidence.toFixed(1)}% confidence`,
-                        icon: 'https://www.google.com/s2/favicons?sz=64&domain=pucks.io'
+                        body: `${player.name} on ${selectedServer?.displayName} - ${detection.confidence.toFixed(1)}% confidence`
                     });
                 }
             }
         }
 
-        // ==================== SPECTATOR COMMAND ====================
         function sendSpectatorCommand() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
@@ -1510,7 +1384,6 @@
             document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
             
             try {
-                // Create chat packet (Packet ID 5) with /team spectator command
                 const chatPacket = {
                     8: ["PacketId", "int", 5],
                     18: ["Data", "dict", {
@@ -1521,7 +1394,7 @@
                 
                 const br = new BR();
                 const encoded = br.encode(chatPacket);
-                const packet = new Uint8Array([10, ...encoded]); // Add multiplex header
+                const packet = new Uint8Array([10, ...encoded]);
                 
                 ws.send(packet);
                 
@@ -1542,11 +1415,9 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Draw field
             ctx.fillStyle = '#0a0a0f';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Field lines
             ctx.strokeStyle = '#e94560';
             ctx.lineWidth = 2;
             ctx.setLineDash([10, 10]);
@@ -1561,12 +1432,10 @@
             ctx.strokeStyle = '#e94560';
             ctx.stroke();
             
-            // Goals
             ctx.fillStyle = '#e94560';
             ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
             ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
             
-            // Ball
             if (ball.x !== undefined && ball.z !== undefined) {
                 ctx.fillStyle = 'white';
                 ctx.shadowColor = 'white';
@@ -1581,16 +1450,13 @@
                 ctx.shadowBlur = 0;
             }
             
-            // Players
             players.forEach(player => {
                 if (player.x === undefined || player.z === undefined) return;
                 
-                // Team colors
                 if (player.team === 0) ctx.fillStyle = '#ef4444';
                 else if (player.team === 1) ctx.fillStyle = '#3b82f6';
                 else ctx.fillStyle = '#a855f7';
                 
-                // Draw car
                 ctx.shadowColor = ctx.fillStyle;
                 ctx.shadowBlur = 15;
                 ctx.beginPath();
@@ -1601,7 +1467,6 @@
                 );
                 ctx.fill();
                 
-                // Suspicious indicator
                 if (player.suspicious) {
                     ctx.fillStyle = '#ef4444';
                     ctx.font = 'bold 24px Arial';
@@ -1613,7 +1478,6 @@
                 
                 ctx.shadowBlur = 0;
                 
-                // Name
                 ctx.fillStyle = 'white';
                 ctx.font = 'bold 12px Arial';
                 ctx.fillText(player.name || '?',
@@ -1688,14 +1552,13 @@
                         <div>Server: <span style="color: #4ade80;">${d.server}</span></div>
                         <div>Team: <span style="color: ${d.team === 0 ? '#ef4444' : d.team === 1 ? '#3b82f6' : '#a855f7'};">${d.team === 0 ? 'RED' : d.team === 1 ? 'BLUE' : 'SPEC'}</span></div>
                         <div>Confidence: <span style="color: #fbbf24;">${d.confidence.toFixed(1)}%</span></div>
-                        <div>Boost Pattern: <span style="color: #4ade80;">${d.boostCount} boosts</span></div>
-                        <div style="grid-column: span 2;">Match Ratio: <span style="color: #ef4444;">${(d.matchRatio * 100).toFixed(1)}% at 130ms intervals</span></div>
+                        <div>Boosts: <span style="color: #4ade80;">${d.boostCount}</span></div>
+                        <div style="grid-column: span 2;">Match Ratio: <span style="color: #ef4444;">${(d.matchRatio * 100).toFixed(1)}% at 130ms</span></div>
                     </div>
                 </div>
             `).join('');
         }
 
-        // ==================== RECORDING ====================
         function startRecording() {
             recordingStartTime = Date.now();
             currentRecording = {
@@ -1726,14 +1589,12 @@
             if (currentRecording) {
                 addLog(`[RECORDING] Stopped - Captured ${currentRecording.packets.length} packets`, 'info');
                 
-                // Save recording to localStorage
                 const recordings = JSON.parse(localStorage.getItem('tournamentRecordings') || '[]');
                 recordings.push({
                     id: currentRecording.id,
                     server: currentRecording.server,
                     timestamp: new Date().toISOString(),
-                    packetCount: currentRecording.packets.length,
-                    duration: Date.now() - currentRecording.startTime
+                    packetCount: currentRecording.packets.length
                 });
                 localStorage.setItem('tournamentRecordings', JSON.stringify(recordings));
                 
@@ -1744,7 +1605,6 @@
             if (timerEl) timerEl.innerText = '00:00';
         }
 
-        // ==================== EXPORT / CLEAR ====================
         function exportDetections() {
             const csv = detections.map(d => 
                 `${d.timestamp},${d.playerName},${d.team},${d.confidence},${d.boostCount},${d.matchRatio}`
@@ -1757,14 +1617,14 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `tournament-detections-${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.csv`;
+            a.download = `detections-${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.csv`;
             a.click();
             
-            addLog(`[EXPORT] Exported ${detections.length} detections to CSV`, 'success');
+            addLog(`[EXPORT] Exported ${detections.length} detections`, 'success');
         }
 
         function clearDetections() {
-            if (confirm('Clear all detection history? This cannot be undone.')) {
+            if (confirm('Clear all detection history?')) {
                 detections = [];
                 localStorage.setItem('tournamentDetections', '[]');
                 updateDetectionsList();
@@ -1790,17 +1650,14 @@
                 Notification.requestPermission();
             }
             
-            // Animation loop
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v2.0 initialized', 'success');
-            addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v3.0 initialized', 'success');
+            addLog('[SYSTEM] Monitoring 8 tournament servers - PASSWORD REQUIRED', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
         });
 
-        // Cleanup
         window.addEventListener('beforeunload', () => {
-            pingIntervals.forEach(clearInterval);
             if (ws) ws.close();
         });
     </script>
