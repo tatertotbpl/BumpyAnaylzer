@@ -477,8 +477,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v4.0</h1>
-        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Packet Logging</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v5.0</h1>
+        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Fixed Authentication</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -610,7 +610,7 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v4.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            TOURNAMENT ANTI-CHEAT SYSTEM v5.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
             © 2024 Tournament Anti-Cheat • Password: rodshot (configurable)
         </div>
     </div>
@@ -646,7 +646,7 @@
             }
         };
 
-        // ==================== PACKET DECODER (from cheat script) ====================
+        // ==================== PACKET DECODER/ENCODER (FIXED) ====================
         class BR {
             constructor(arr) {
                 this.arr = arr || [];
@@ -674,13 +674,34 @@
                 return [r, 5];
             }
             
+            writeInt7(num) {
+                let bytes = [];
+                while (num >= 128) {
+                    bytes.push((num & 127) | 128);
+                    num = Math.floor(num / 128);
+                }
+                bytes.push(num & 127);
+                return bytes;
+            }
+            
             str() {
                 let l = this.int7()[0];
                 return new TextDecoder().decode(new Uint8Array(this.rbs(l)));
             }
             
+            writeStr(str) {
+                let encoder = new TextEncoder();
+                let bytes = Array.from(encoder.encode(str));
+                return [...this.writeInt7(bytes.length), ...bytes];
+            }
+            
             f32() {
                 return new Float32Array(new Uint8Array(this.rbs(4)).buffer)[0];
+            }
+            
+            writeF32(num) {
+                let arr = new Float32Array([num]);
+                return Array.from(new Uint8Array(arr.buffer));
             }
             
             static Packet = {
@@ -690,7 +711,7 @@
                         10: ["name", "string"],
                         18: ["uid", "string"],
                         32: ["skinId", "uint"],
-                        56: ["authenticationMethod", "string"] // This is the password field!
+                        56: ["authenticationMethod", "string"]
                     }]
                 },
                 2: {
@@ -867,44 +888,45 @@
                 return obj;
             }
             
-            bit7(num) {
-                let bytes = [];
-                for(; num >= 128; num >>= 7) bytes.push((128 | num) % 256);
-                bytes.push(num % 256);
-                return bytes;
-            }
-            
-            ft32(num) {
-                let f = new Float32Array([num]);
-                return Array.from(new Uint8Array(f.buffer));
-            }
-            
-            istr(value) {
-                let s = new TextEncoder().encode(value);
-                return [...this.bit7(s.length), ...s];
-            }
-            
             encode(packet) {
-                this.arr = [];
-                for (let byte in packet) {
-                    let [keyName, valueType, value] = packet[byte];
+                let bytes = [];
+                let keys = Object.keys(packet).sort((a, b) => parseInt(a) - parseInt(b));
+                
+                for (let byteKey of keys) {
+                    let [keyName, valueType, value] = packet[byteKey];
+                    let byteNum = parseInt(byteKey);
+                    
+                    bytes.push(byteNum);
                     
                     switch(valueType) {
                         case "int": case "uint": case "bool":
-                            this.arr.push(parseInt(byte));
-                            this.arr.push(...this.bit7(value));
+                            bytes.push(...this.writeInt7(value));
                             break;
                         case "string":
-                            this.arr.push(parseInt(byte));
-                            this.arr.push(...this.istr(value));
+                            bytes.push(...this.writeStr(value));
                             break;
                         case "float":
-                            this.arr.push(parseInt(byte));
-                            this.arr.push(...this.ft32(value));
+                            bytes.push(...this.writeF32(value));
+                            break;
+                        case "dict":
+                            let subEncoder = new BR();
+                            let subBytes = subEncoder.encode(value);
+                            bytes.push(...this.writeInt7(subBytes.length));
+                            bytes.push(...subBytes);
+                            break;
+                        case "arr":
+                            let arrBytes = [];
+                            for (let item of value) {
+                                let itemEncoder = new BR();
+                                let itemBytes = itemEncoder.encode(item);
+                                arrBytes.push(...itemBytes);
+                            }
+                            bytes.push(...this.writeInt7(arrBytes.length));
+                            bytes.push(...arrBytes);
                             break;
                     }
                 }
-                return this.arr;
+                return bytes;
             }
         }
 
@@ -963,7 +985,6 @@
         function initServers() {
             addLog('Initializing tournament server list...', 'info');
             
-            // New York servers
             const nyDiv = document.getElementById('ny-servers');
             if (nyDiv) {
                 nyDiv.innerHTML = '';
@@ -982,7 +1003,6 @@
                 });
             }
             
-            // Frankfurt servers
             const fraDiv = document.getElementById('fra-servers');
             if (fraDiv) {
                 fraDiv.innerHTML = '';
@@ -1021,7 +1041,7 @@
             document.getElementById('selectedServer').innerHTML = `
                 <strong style="color: #e94560;">SELECTED: ${selectedServer.fullName}</strong><br>
                 <span style="color: #a0aec0; font-size: 13px;">${selectedServer.url}</span>
-                <br><span style="color: #fbbf24; font-size: 12px;">⚠️ PASSWORD REQUIRED FOR CONNECTION</span>
+                <br><span style="color: #fbbf24; font-size: 12px;">⚠️ PASSWORD REQUIRED</span>
             `;
             
             document.getElementById('connectBtn').disabled = false;
@@ -1052,7 +1072,6 @@
             addLog('[AUTH] Sending authentication packet...', 'info');
             
             try {
-                // Generate random username like the game does
                 const username = generateUsername();
                 const uid = generateUID();
                 currentUsername = username;
@@ -1060,25 +1079,21 @@
                 addLog(`[AUTH] Username: ${username}`, 'info');
                 addLog(`[AUTH] UID: ${uid.substring(0, 8)}...`, 'info');
                 
-                // EXACT packet format from the game
                 const authPacket = {
                     8: ["PacketId", "int", 1],
                     18: ["Data", "dict", {
                         10: ["name", "string", username],
                         18: ["uid", "string", uid],
-                        32: ["skinId", "uint", 230],  // Default skin
-                        56: ["authenticationMethod", "string", password] // This is where the password goes!
+                        32: ["skinId", "uint", 230],
+                        56: ["authenticationMethod", "string", password]
                     }]
                 };
                 
-                // Encode the packet
-                const br = new BR();
-                const encoded = br.encode(authPacket);
-                
-                // Add multiplex header (0x10) - this makes it 26 bytes!
+                const encoder = new BR();
+                const encoded = encoder.encode(authPacket);
                 const packet = new Uint8Array([10, ...encoded]);
                 
-                addLog(`[AUTH] Sending ${packet.length} byte packet`, 'info');
+                addLog(`[AUTH] Packet size: ${packet.length} bytes (should be ~26)`, 'info');
                 
                 // Log first few bytes for debugging
                 const hexPreview = Array.from(packet.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' ');
@@ -1120,7 +1135,7 @@
             packetCount = 0;
             
             addLog(`[CONNECTION] Connecting to ${selectedServer?.displayName}...`, 'info');
-            showStatus(`CONNECTING TO ${selectedServer?.displayName}...`, 'status-connecting');
+            showStatus(`CONNECTING...`, 'status-connecting');
             
             try {
                 ws = new WebSocket(url);
@@ -1136,14 +1151,13 @@
                 
                 ws.onopen = () => {
                     clearTimeout(connectionTimeout);
-                    addLog(`[CONNECTION] ✅ Connected to ${selectedServer?.displayName}`, 'success');
+                    addLog(`[CONNECTION] ✅ Connected`, 'success');
                     showStatus(`CONNECTED`, 'status-connected');
                     
                     document.getElementById('connectBtn').disabled = true;
                     document.getElementById('disconnectBtn').disabled = false;
                     document.getElementById('gameView').style.display = 'block';
                     
-                    // Send authentication with the password
                     sendAuthentication(password);
                     
                     startRecording();
@@ -1154,8 +1168,16 @@
                     packetCount++;
                     
                     if (packetCount === 1) {
-                        addLog(`[DEBUG] First packet received - ${data.length} bytes`, 'info');
-                        addLog(`[DEBUG] Packet type: ${data[1]} (should be 2 for game state)`, 'info');
+                        addLog(`[DEBUG] First packet received - ${data.length} bytes, type: ${data[1]}`, 'info');
+                        
+                        // If we get packet type 2, authentication succeeded!
+                        if (data[1] === 2) {
+                            addLog('[AUTH] ✅ Authentication successful!', 'success');
+                            
+                            if (document.getElementById('autoSpectator').checked) {
+                                setTimeout(sendSpectatorCommand, 1000);
+                            }
+                        }
                     }
                     
                     const br = new BR();
@@ -1167,16 +1189,6 @@
                         });
                     } else if (packets) {
                         handlePacket(packets);
-                    }
-                    
-                    // If we get packet 2 (game state), we're authenticated!
-                    if (data[1] === 2 && packetCount === 1) {
-                        addLog('[AUTH] ✅ Authentication successful!', 'success');
-                        
-                        // Send spectator command after successful auth
-                        if (document.getElementById('autoSpectator').checked) {
-                            setTimeout(sendSpectatorCommand, 1000);
-                        }
                     }
                 };
                 
@@ -1190,10 +1202,10 @@
                     else if (event.code === 1003) reason = 'Unsupported data';
                     else if (event.code === 1005) reason = 'No status received';
                     else if (event.code === 1006) reason = 'Abnormal closure - Wrong password?';
-                    else if (event.code === 1008) reason = 'Policy violation - Wrong password?';
+                    else if (event.code === 1008) reason = 'Policy violation';
                     
                     addLog(`[CONNECTION] Disconnected - ${reason}`, 'warning');
-                    showStatus(`DISCONNECTED`, 'status-error');
+                    showStatus('DISCONNECTED', 'status-error');
                     
                     document.getElementById('connectBtn').disabled = false;
                     document.getElementById('disconnectBtn').disabled = true;
@@ -1202,7 +1214,7 @@
                 
                 ws.onerror = () => {
                     clearTimeout(connectionTimeout);
-                    addLog('[ERROR] Connection failed - Check password', 'error');
+                    addLog('[ERROR] Connection failed', 'error');
                     showStatus('CONNECTION FAILED', 'status-error');
                 };
                 
@@ -1228,11 +1240,8 @@
             const data = packet.Data;
             
             switch(packetId) {
-                case 2: // Game state
-                    addLog('[GAME] Received game state', 'success');
-                    
+                case 2:
                     if (data?.players?.list) {
-                        addLog(`[PLAYERS] ${data.players.list.length} players in game`, 'info');
                         data.players.list.forEach(player => updatePlayer(player));
                     }
                     if (data?.gameState) {
@@ -1246,15 +1255,24 @@
                             });
                         }
                     }
+                    if (data?.entities?.list) {
+                        data.entities.list.forEach(entity => {
+                            if (entity?.entity?.entityType === 1) {
+                                ball = entity.entity.position;
+                            } else if (entity?.entity?.playerId) {
+                                entities.set(entity.id, entity.entity.playerId);
+                            }
+                        });
+                    }
                     break;
                     
-                case 7: // Movement command
+                case 7:
                     if (data?.command && data?.EID) {
                         handleBoost(data.EID);
                     }
                     break;
                     
-                case 8: // Entity update
+                case 8:
                     if (data?.entity) {
                         if (data.entity.entityType === 1) {
                             ball = data.entity.position;
@@ -1264,7 +1282,7 @@
                     }
                     break;
                     
-                case 12: // Game state update
+                case 12:
                     if (data?.timeRemaining !== undefined) {
                         gameState.timeRemaining = data.timeRemaining;
                         updateGameTime();
@@ -1387,7 +1405,7 @@
                 
                 if (Notification.permission === 'granted') {
                     new Notification('🚨 AUTO-BACKBOOST DETECTED!', {
-                        body: `${player.name} on ${selectedServer?.displayName} - ${detection.confidence.toFixed(1)}% confidence`
+                        body: `${player.name} - ${detection.confidence.toFixed(1)}% confidence`
                     });
                 }
             }
@@ -1411,8 +1429,8 @@
                     }]
                 };
                 
-                const br = new BR();
-                const encoded = br.encode(chatPacket);
+                const encoder = new BR();
+                const encoded = encoder.encode(chatPacket);
                 const packet = new Uint8Array([10, ...encoded]);
                 
                 ws.send(packet);
@@ -1661,10 +1679,9 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v4.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v5.0 initialized', 'success');
             addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
-            addLog('[SYSTEM] Default password: rodshot (can be changed in input)', 'info');
         });
 
         window.addEventListener('beforeunload', () => {
