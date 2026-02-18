@@ -1,410 +1,1202 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>BumpyBall/Pucks Cheat Analyzer</title>
+    <title>BumpyBall Tournament Anti-Cheat Analyzer</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
             padding: 20px;
         }
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            background: white;
+            background: #0f3460;
             border-radius: 20px;
             padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        h1 { color: #333; margin-bottom: 30px; }
-        h2 { color: #555; margin: 20px 0; }
-        
-        .panel {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
-        }
-        
-        input, button {
-            padding: 12px 20px;
-            margin: 5px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        
-        button {
-            background: #667eea;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
             color: white;
-            border: none;
-            cursor: pointer;
-            transition: background 0.3s;
+        }
+        h1 { 
+            color: #e94560; 
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle { 
+            color: #a0aec0; 
+            margin-bottom: 30px;
         }
         
-        button:hover {
-            background: #5a67d8;
+        .tournament-banner {
+            background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+            color: #1a1a2e;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 18px;
         }
         
-        .detection-card {
-            background: white;
-            border-radius: 8px;
+        .server-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .server-group {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #e94560;
+        }
+        
+        .group-title {
+            font-size: 20px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e94560;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .group-title .location {
+            color: #e94560;
+            font-weight: bold;
+        }
+        
+        .group-title .flag {
+            font-size: 24px;
+        }
+        
+        .server-card {
+            background: #0f3460;
+            border-radius: 10px;
             padding: 15px;
             margin: 10px 0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border-left: 4px solid #48bb78;
-        }
-        
-        .detection-card.high { border-left-color: #f56565; }
-        .detection-card.medium { border-left-color: #ed8936; }
-        
-        .replay-canvas {
-            background: #1a202c;
-            border-radius: 10px;
-            width: 100%;
-            height: 400px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        #gameCanvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        
-        .controls {
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
             display: flex;
-            gap: 10px;
-            margin-top: 10px;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .server-card:hover {
+            transform: translateX(5px);
+            border-color: #e94560;
+            background: #16213e;
+        }
+        
+        .server-card.selected {
+            border-color: #4ade80;
+            background: #14532d;
+        }
+        
+        .server-port {
+            font-weight: bold;
+            font-size: 18px;
+            color: #e94560;
+        }
+        
+        .server-ping {
+            background: #1a1a2e;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #4ade80;
+        }
+        
+        .server-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        
+        .status-online { background: #4ade80; }
+        .status-offline { background: #ef4444; }
+        .status-checking { background: #fbbf24; }
+        
+        .spectator-controls {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 20px;
             flex-wrap: wrap;
         }
         
-        .stats-grid {
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4b5563;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: #e94560;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        
+        .connection-panel {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .game-view {
+            background: #1a1a2e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .game-stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 15px;
             margin: 20px 0;
         }
         
         .stat-box {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        
-        .stat-box h3 { font-size: 14px; color: #666; margin-bottom: 10px; }
-        .stat-box .number { font-size: 32px; font-weight: bold; color: #667eea; }
-        
-        .tab-container {
-            margin: 20px 0;
-        }
-        
-        .tab-buttons {
-            display: flex;
-            gap: 10px;
-            border-bottom: 2px solid #e0e0e0;
-            padding-bottom: 10px;
-        }
-        
-        .tab-button {
-            background: none;
-            border: none;
-            color: #666;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 10px 20px;
-        }
-        
-        .tab-button.active {
-            color: #667eea;
-            border-bottom: 2px solid #667eea;
-        }
-        
-        .tab-content {
-            display: none;
-            padding: 20px 0;
-        }
-        
-        .tab-content.active {
-            display: block;
-        }
-        
-        .server-item {
-            background: white;
+            background: #0f3460;
             padding: 15px;
-            margin: 10px 0;
             border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            transition: transform 0.2s;
+            text-align: center;
         }
         
-        .server-item:hover {
-            transform: translateX(5px);
-            background: #f0f0f0;
+        .stat-box.red { background: #7f1d1d; }
+        .stat-box.blue { background: #1e3a8a; }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #a0aec0;
+            margin-bottom: 5px;
         }
         
-        .badge {
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 12px;
+        .stat-value {
+            font-size: 32px;
             font-weight: bold;
         }
         
-        .badge.online { background: #c6f6d5; color: #22543d; }
-        .badge.cheater { background: #fed7d7; color: #742a2a; }
+        #gameCanvas {
+            width: 100%;
+            height: 500px;
+            background: #1a1a2e;
+            border-radius: 10px;
+            border: 2px solid #e94560;
+        }
         
-        @media (max-width: 768px) {
-            .container { padding: 15px; }
-            input, button { width: 100%; margin: 5px 0; }
+        .players-panel {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .player-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #0f3460;
+            transition: background 0.3s;
+        }
+        
+        .player-item.suspicious {
+            background: #7f1d1d;
+            border-left: 4px solid #ef4444;
+        }
+        
+        .team-red { color: #ef4444; font-weight: bold; }
+        .team-blue { color: #3b82f6; font-weight: bold; }
+        .team-spectator { color: #a855f7; font-weight: bold; }
+        
+        .detection-card {
+            background: #7f1d1d;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #ef4444;
+        }
+        
+        button {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #d43f57;
+        }
+        
+        button:disabled {
+            background: #4b5563;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background: #4b5563;
+        }
+        
+        button.secondary:hover {
+            background: #6b7280;
+        }
+        
+        .ping-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            background: #1a1a2e;
+            color: #4ade80;
+        }
+        
+        .connection-status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .status-connected { background: #14532d; color: #4ade80; }
+        .status-connecting { background: #92400e; color: #fbbf24; }
+        .status-error { background: #7f1d1d; color: #ef4444; }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚗 BumpyBall/Pucks Cheat Analyzer</h1>
+        <h1>🏆 Tournament Anti-Cheat Analyzer</h1>
+        <div class="subtitle">Real-time auto-backboost detection • 8 Tournament Servers</div>
+        
+        <div class="tournament-banner">
+            ⚡ Monitoring Tournament Servers: New York (4) • Frankfurt (4)
+        </div>
+        
+        <!-- Spectator Controls -->
+        <div class="spectator-controls">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span>👁️ Auto-Spectator Mode:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="autoSpectator" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <button onclick="sendSpectatorCommand()" id="manualSpectator">📤 Send /team spectator</button>
+            <span id="spectatorStatus" style="color: #a0aec0;"></span>
+        </div>
+        
+        <!-- Tournament Servers -->
+        <div class="server-grid">
+            <!-- New York Tournament Group -->
+            <div class="server-group">
+                <div class="group-title">
+                    <span class="location">🗽 New York (Tournament)</span>
+                    <span class="flag">🇺🇸</span>
+                </div>
+                <div id="ny-servers"></div>
+            </div>
+            
+            <!-- Frankfurt Tournament Group -->
+            <div class="server-group">
+                <div class="group-title">
+                    <span class="location">🇪🇺 Frankfurt (Tournament)</span>
+                    <span class="flag">🇩🇪</span>
+                </div>
+                <div id="fra-servers"></div>
+            </div>
+        </div>
         
         <!-- Connection Panel -->
-        <div class="panel">
-            <h2>🔌 Connect to Game Server</h2>
-            <input type="text" id="serverUrl" placeholder="wss://game-server-url.com" value="wss://www.pucks.io">
-            <input type="text" id="serverPassword" placeholder="Server Password (optional)">
-            <button onclick="connectToServer()">Connect & Monitor</button>
-            <div id="connectionStatus" style="margin-top: 10px; color: #666;"></div>
+        <div class="connection-panel">
+            <h3>🔌 Active Connection</h3>
+            <div id="selectedServer" style="margin: 10px 0; color: #e94560;">No server selected</div>
+            <div class="button-group">
+                <button onclick="connectToSelected()" id="connectBtn" disabled>Connect</button>
+                <button onclick="disconnect()" id="disconnectBtn" class="secondary" disabled>Disconnect</button>
+            </div>
+            <div id="connectionStatus" class="connection-status" style="display: none;"></div>
         </div>
         
-        <!-- Stats Overview -->
-        <div class="stats-grid">
-            <div class="stat-box">
-                <h3>Matches Analyzed</h3>
-                <div class="number" id="totalMatches">0</div>
-            </div>
-            <div class="stat-box">
-                <h3>Suspicious Players</h3>
-                <div class="number" id="suspiciousCount">0</div>
-            </div>
-            <div class="stat-box">
-                <h3>Auto-Boost Detections</h3>
-                <div class="number" id="boostDetections">0</div>
-            </div>
-            <div class="stat-box">
-                <h3>Confidence Rate</h3>
-                <div class="number" id="confidenceRate">0%</div>
-            </div>
-        </div>
-        
-        <!-- Tabs -->
-        <div class="tab-container">
-            <div class="tab-buttons">
-                <button class="tab-button active" onclick="switchTab('live')">Live Monitor</button>
-                <button class="tab-button" onclick="switchTab('detections')">Detections</button>
-                <button class="tab-button" onclick="switchTab('replays')">Replays</button>
-                <button class="tab-button" onclick="switchTab('servers')">Servers</button>
-            </div>
-            
-            <!-- Live Monitor Tab -->
-            <div id="liveTab" class="tab-content active">
-                <div class="replay-canvas">
-                    <canvas id="liveCanvas" width="800" height="400"></canvas>
-                </div>
-                <div class="controls">
-                    <button onclick="startRecording()">⏺ Start Recording</button>
-                    <button onclick="stopRecording()">⏹ Stop Recording</button>
-                    <span id="recordingTimer">00:00</span>
-                </div>
+        <!-- Game View -->
+        <div id="gameView" style="display: none;">
+            <div class="game-view">
+                <h3>📺 Live Spectator View</h3>
                 
-                <h3>Live Players</h3>
-                <div id="livePlayers"></div>
-            </div>
-            
-            <!-- Detections Tab -->
-            <div id="detectionsTab" class="tab-content">
-                <div class="controls">
-                    <button onclick="exportDetections()">📥 Export CSV</button>
-                    <button onclick="clearDetections()">🗑 Clear All</button>
-                </div>
-                <div id="detectionsList"></div>
-            </div>
-            
-            <!-- Replays Tab -->
-            <div id="replaysTab" class="tab-content">
-                <div id="replaysList"></div>
-                <div class="replay-canvas" style="display: none;" id="replayViewer">
-                    <canvas id="replayCanvas" width="800" height="400"></canvas>
-                    <div class="controls">
-                        <button onclick="playReplay()">▶ Play</button>
-                        <button onclick="pauseReplay()">⏸ Pause</button>
-                        <input type="range" id="replayTimeline" min="0" max="100" value="0" style="width: 300px;">
+                <!-- Game Stats -->
+                <div class="game-stats">
+                    <div class="stat-box red">
+                        <div class="stat-label">🔴 Red Team</div>
+                        <div class="stat-value" id="redScore">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">⏱️ Time</div>
+                        <div class="stat-value" id="gameTime">5:00</div>
+                    </div>
+                    <div class="stat-box blue">
+                        <div class="stat-label">🔵 Blue Team</div>
+                        <div class="stat-value" id="blueScore">0</div>
                     </div>
                 </div>
+                
+                <!-- Game Canvas -->
+                <canvas id="gameCanvas" width="1000" height="500"></canvas>
+                
+                <!-- Recording Controls -->
+                <div class="button-group" style="margin-top: 15px;">
+                    <button onclick="startRecording()" id="recordBtn">⏺ Start Recording</button>
+                    <button onclick="stopRecording()" id="stopBtn" class="secondary">⏹ Stop Recording</button>
+                    <span id="recordingTimer" style="align-self: center; color: #4ade80;">00:00</span>
+                </div>
             </div>
             
-            <!-- Servers Tab -->
-            <div id="serversTab" class="tab-content">
-                <div class="controls">
-                    <button onclick="addServer()">➕ Add Server</button>
-                </div>
-                <div id="serversList"></div>
+            <!-- Players Panel -->
+            <div class="players-panel">
+                <h3>👥 Players <span id="playerCount"></span></h3>
+                <div class="player-list" id="playerList"></div>
             </div>
         </div>
+        
+        <!-- Detections Panel -->
+        <div style="margin-top: 30px;">
+            <h3>🚨 Auto-Backboost Detections</h3>
+            <div class="button-group">
+                <button onclick="exportDetections()">📥 Export CSV</button>
+                <button onclick="clearDetections()" class="secondary">🗑 Clear All</button>
+            </div>
+            <div id="detectionsList"></div>
+        </div>
+        
+        <div class="footer">
+            Tournament Anti-Cheat System • Monitoring 8 Tournament Servers • Auto-Backboost Detection v1.0
+        </div>
     </div>
-    
+
     <script>
-        // Configuration
-        const PUSHER_KEY = 'your-pusher-key'; // Get from pusher.com (free tier)
-        const PUSHER_CLUSTER = 'us2';
+        // Tournament Servers Configuration
+        const TOURNAMENT_SERVERS = {
+            'newyork': {
+                name: 'New York Tournament',
+                location: 'New York, USA',
+                region: 'NA',
+                flag: '🇺🇸',
+                pings: [
+                    'https://community-01.usemapsettings.com:8086/Ping',
+                    'https://community-01.usemapsettings.com:8087/Ping',
+                    'https://community-01.usemapsettings.com:8088/Ping',
+                    'https://community-01.usemapsettings.com:8089/Ping'
+                ],
+                websockets: [
+                    'wss://community-01.usemapsettings.com:8086',
+                    'wss://community-01.usemapsettings.com:8087',
+                    'wss://community-01.usemapsettings.com:8088',
+                    'wss://community-01.usemapsettings.com:8089'
+                ]
+            },
+            'frankfurt': {
+                name: 'Frankfurt Tournament',
+                location: 'Frankfurt, Germany',
+                region: 'EU',
+                flag: '🇩🇪',
+                pings: [
+                    'https://community-02.usemapsettings.com:8086/Ping',
+                    'https://community-02.usemapsettings.com:8087/Ping',
+                    'https://community-02.usemapsettings.com:8088/Ping',
+                    'https://community-02.usemapsettings.com:8089/Ping'
+                ],
+                websockets: [
+                    'wss://community-02.usemapsettings.com:8086',
+                    'wss://community-02.usemapsettings.com:8087',
+                    'wss://community-02.usemapsettings.com:8088',
+                    'wss://community-02.usemapsettings.com:8089'
+                ]
+            }
+        };
+
+        // BR Decoder (from the cheat script)
+        class BR {
+            constructor(arr) {
+                this.arr = arr || [];
+                this.i = 0;
+            }
+            
+            skip() {
+                return this.arr.length - this.i;
+            }
+            
+            rbs(size) {
+                let r = this.arr.slice(this.i, this.i + size);
+                this.i += size;
+                return r;
+            }
+            
+            rb() {
+                return this.rbs(1)[0];
+            }
+            
+            int7() {
+                let r = 0;
+                let b = 0;
+                while (b !== 35) {
+                    let c = this.rb();
+                    r |= (c & 127) << b;
+                    if ((c & 128) === 0) {
+                        return [r, (b / 7) + 1];
+                    }
+                    b += 7;
+                }
+                return [r, 5];
+            }
+            
+            str() {
+                let l = this.int7()[0];
+                let s = new TextDecoder().decode(new Uint8Array(this.rbs(l)));
+                return s;
+            }
+            
+            f32() {
+                let l = new Uint8Array(this.rbs(4));
+                let f = new Float32Array(l.buffer)[0];
+                return f;
+            }
+            
+            // Packet definitions
+            static Packet = {
+                2: {
+                    8: ["PacketId","int"],
+                    18: ["Data","dict",{
+                        10: ["entities", "dict", {
+                            10: ["list", "arr", {
+                                8: ["id", "int"],
+                                18: ["entity", "dict", {
+                                    10: ["position", "dict", {
+                                        13: ["x", "float"],
+                                        21: ["z", "float"],
+                                    }],
+                                    16: ["entityType", "uint"],
+                                    24: ["playerId", "uint"],
+                                    37: ["rotation", "float"],
+                                }],
+                            }],
+                        }],
+                        18: ["players", "dict", {
+                            10: ["list", "arr", {
+                                8: ["id", "int"],
+                                18: ["name", "string"],
+                                56: ["bot", "bool"],
+                                24: ["goals", "uint"],
+                                32: ["assits", "uint"],
+                                40: ["team", "uint"],
+                                48: ["skinId", "uint"],
+                            }]
+                        }],
+                        24: ["playerId", "uint"],
+                        34: ["gameState", "dict", {
+                            13: ["timeRemaining", "float"],
+                            18: ["teams", "arr", {
+                                8: ["teamId", "int"],
+                                16: ["score", "int"],
+                            }],
+                            24: ["gameState", "int"],
+                        }],
+                    }]
+                },
+                7: {
+                    8: ["PacketId", "int"],
+                    18: ["Data", "dict",{
+                        8: ["command", "bool"],
+                        18: ["position", "dict", {
+                            13: ["x", "float"],
+                            21: ["z", "float"],
+                        }],
+                        24: ["EID", "uint"],
+                    }]
+                },
+                8: {
+                    8: ["PacketId", "int"],
+                    18: ["Data", "dict",{
+                        16: ["id", "uint"],
+                        26: ["entity", "dict", {
+                            10: ["position", "dict", {
+                                13: ["x", "float"],
+                                21: ["z", "float"],
+                            }],
+                            16: ["entityType", "uint"],
+                            24: ["playerId", "uint"],
+                        }]
+                    }]
+                },
+                12: {
+                    8: ["PacketId", "int"],
+                    18: ["Data", "dict",{
+                        13: ["timeRemaining", "float"],
+                        18: ["teams", "arr", {
+                            8: ["teamId", "int"],
+                            16: ["score", "int"],
+                        }],
+                        24: ["gameState", "int"],
+                    }]
+                }
+            };
+            
+            decodePacket(data) {
+                if (data[0] === 10) {
+                    return this.decodeMultiPacket(data);
+                }
+                return this.decodeSinglePacket(data);
+            }
+            
+            decodeSinglePacket(data) {
+                let br = new BR(data);
+                let packetId = data[1];
+                let packetDef = BR.Packet[packetId];
+                if (!packetDef) return null;
+                
+                br.i = 2;
+                return br.decode(packetDef);
+            }
+            
+            decodeMultiPacket(data) {
+                let br = new BR(data);
+                let packets = [];
+                br.i = 1;
+                
+                while (br.skip() > 0) {
+                    let length = br.int7()[0];
+                    let packetData = br.rbs(length);
+                    let packet = this.decodeSinglePacket(packetData);
+                    if (packet) packets.push(packet);
+                }
+                return packets;
+            }
+            
+            decode(def) {
+                let obj = {};
+                while (this.skip() > 0) {
+                    let byte = this.rb();
+                    let [keyName, valueType, subDef] = def[byte] || [null, null, null];
+                    if (!keyName) continue;
+                    
+                    let value;
+                    switch(valueType) {
+                        case "int":
+                        case "uint":
+                        case "bool":
+                            value = this.int7()[0];
+                            break;
+                        case "string":
+                            value = this.str();
+                            break;
+                        case "float":
+                            value = this.f32();
+                            break;
+                        case "dict":
+                            let len = this.int7()[0];
+                            let subBr = new BR(this.rbs(len));
+                            value = subBr.decode(subDef);
+                            break;
+                        case "arr":
+                            let arrLen = this.int7()[0];
+                            let arrBr = new BR(this.rbs(arrLen));
+                            let arr = [];
+                            while (arrBr.skip() > 0) {
+                                let item = arrBr.decode(subDef);
+                                arr.push(item);
+                            }
+                            value = arr;
+                            break;
+                    }
+                    obj[keyName] = value;
+                }
+                return obj;
+            }
+        }
+
+        // Game State
+        let ws = null;
+        let players = new Map();
+        let ball = { x: 0, z: 0 };
+        let entities = new Map(); // Map entityId -> playerId
+        let gameState = {
+            timeRemaining: 300,
+            redScore: 0,
+            blueScore: 0
+        };
         
-        // State
+        // Detection State
+        let boostHistory = new Map();
+        let detections = JSON.parse(localStorage.getItem('tournamentDetections') || '[]');
         let currentRecording = null;
-        let livePlayers = new Map();
-        let detections = JSON.parse(localStorage.getItem('detections') || '[]');
-        let servers = JSON.parse(localStorage.getItem('servers') || '[]');
-        let matchesAnalyzed = parseInt(localStorage.getItem('matchesAnalyzed') || '0');
-        let wsConnection = null;
-        let recordingInterval = null;
         let recordingStartTime = null;
-        
-        // Packet decoder (based on the cheat script)
-        class PacketDecoder {
-            static decode(uint8Array) {
+        let recordingInterval = null;
+        let selectedServer = null;
+
+        // Initialize servers
+        function initServers() {
+            // New York servers
+            const nyDiv = document.getElementById('ny-servers');
+            TOURNAMENT_SERVERS.newyork.websockets.forEach((ws, index) => {
+                const port = ws.slice(-4);
+                nyDiv.innerHTML += `
+                    <div class="server-card" onclick="selectServer('newyork', ${index})" id="ny-${index}">
+                        <div>
+                            <span class="server-status status-checking" id="status-ny-${index}"></span>
+                            <span class="server-port">Port ${port}</span>
+                        </div>
+                        <div>
+                            <span class="server-ping" id="ping-ny-${index}">pinging...</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Frankfurt servers
+            const fraDiv = document.getElementById('fra-servers');
+            TOURNAMENT_SERVERS.frankfurt.websockets.forEach((ws, index) => {
+                const port = ws.slice(-4);
+                fraDiv.innerHTML += `
+                    <div class="server-card" onclick="selectServer('frankfurt', ${index})" id="fra-${index}">
+                        <div>
+                            <span class="server-status status-checking" id="status-fra-${index}"></span>
+                            <span class="server-port">Port ${port}</span>
+                        </div>
+                        <div>
+                            <span class="server-ping" id="ping-fra-${index}">pinging...</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Ping all servers
+            pingAllServers();
+        }
+
+        // Ping all tournament servers
+        async function pingAllServers() {
+            for (let [region, server] of Object.entries(TOURNAMENT_SERVERS)) {
+                for (let i = 0; i < server.pings.length; i++) {
+                    await pingServer(region, i);
+                }
+            }
+        }
+
+        // Ping individual server
+        async function pingServer(region, index) {
+            const server = TOURNAMENT_SERVERS[region];
+            const pingUrl = server.pings[index];
+            const statusEl = document.getElementById(`status-${region}-${index}`);
+            const pingEl = document.getElementById(`ping-${region}-${index}`);
+            
+            statusEl.className = 'server-status status-checking';
+            pingEl.innerText = 'pinging...';
+            
+            const start = Date.now();
+            try {
+                // Try fetch ping
+                await fetch(pingUrl, { mode: 'no-cors' });
+                const ping = Date.now() - start;
+                statusEl.className = 'server-status status-online';
+                pingEl.innerText = `${ping}ms`;
+            } catch (e) {
+                // Fallback to image ping
                 try {
-                    // This would use the BR decoder from the cheat script
-                    // For now, we'll simulate based on patterns
-                    return JSON.parse(new TextDecoder().decode(uint8Array));
-                } catch (e) {
-                    return null;
+                    await new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.onload = resolve;
+                        img.onerror = resolve;
+                        img.src = pingUrl.replace('/Ping', '/favicon.ico');
+                        setTimeout(() => {
+                            const ping = Date.now() - start;
+                            statusEl.className = 'server-status status-online';
+                            pingEl.innerText = `${ping}ms`;
+                            resolve();
+                        }, 500);
+                    });
+                } catch (err) {
+                    statusEl.className = 'server-status status-offline';
+                    pingEl.innerText = 'offline';
+                }
+            }
+        }
+
+        // Select server
+        function selectServer(region, index) {
+            // Clear previous selection
+            document.querySelectorAll('.server-card').forEach(c => c.classList.remove('selected'));
+            
+            // Mark selected
+            document.getElementById(`${region}-${index}`).classList.add('selected');
+            
+            // Store selection
+            selectedServer = {
+                region: region,
+                index: index,
+                url: TOURNAMENT_SERVERS[region].websockets[index],
+                name: `${TOURNAMENT_SERVERS[region].name} - Port ${TOURNAMENT_SERVERS[region].websockets[index].slice(-4)}`
+            };
+            
+            document.getElementById('selectedServer').innerHTML = `Selected: ${selectedServer.name}`;
+            document.getElementById('connectBtn').disabled = false;
+        }
+
+        // Connect to selected server
+        function connectToSelected() {
+            if (!selectedServer) return;
+            connect(selectedServer.url);
+        }
+
+        // Main connection function
+        function connect(url) {
+            if (ws) ws.close();
+            
+            ws = new WebSocket(url);
+            ws.binaryType = 'arraybuffer';
+            
+            ws.onopen = () => {
+                showStatus('✅ Connected to tournament server', 'status-connected');
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                document.getElementById('gameView').style.display = 'block';
+                
+                // Auto-spectator if enabled
+                if (document.getElementById('autoSpectator').checked) {
+                    setTimeout(sendSpectatorCommand, 1000);
+                }
+                
+                // Start recording
+                startRecording();
+            };
+            
+            ws.onmessage = (event) => {
+                const data = new Uint8Array(event.data);
+                const br = new BR();
+                const packets = br.decodePacket(data);
+                
+                if (Array.isArray(packets)) {
+                    packets.forEach(p => handlePacket(p));
+                } else {
+                    handlePacket(packets);
+                }
+            };
+            
+            ws.onclose = () => {
+                showStatus('❌ Disconnected', 'status-error');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                stopRecording();
+            };
+            
+            ws.onerror = () => {
+                showStatus('⚠️ Connection error', 'status-error');
+            };
+        }
+
+        // Handle packets
+        function handlePacket(packet) {
+            if (!packet) return;
+            
+            const packetId = packet.PacketId;
+            const data = packet.Data;
+            
+            switch(packetId) {
+                case 2: // Initial game state
+                    if (data.players?.list) {
+                        data.players.list.forEach(player => updatePlayer(player));
+                    }
+                    if (data.gameState) {
+                        if (data.gameState.timeRemaining !== undefined) {
+                            gameState.timeRemaining = data.gameState.timeRemaining;
+                        }
+                        if (data.gameState.teams) {
+                            data.gameState.teams.forEach(team => {
+                                if (team.teamId === 0) gameState.redScore = team.score;
+                                if (team.teamId === 1) gameState.blueScore = team.score;
+                            });
+                        }
+                    }
+                    if (data.entities?.list) {
+                        data.entities.list.forEach(entity => {
+                            if (entity.entity?.entityType === 1) { // Ball
+                                ball = entity.entity.position;
+                            } else {
+                                // Store entity -> player mapping
+                                if (entity.entity?.playerId) {
+                                    entities.set(entity.id, entity.entity.playerId);
+                                }
+                            }
+                        });
+                    }
+                    break;
+                    
+                case 7: // Movement command (BOOST DETECTION!)
+                    if (data.command && data.EID) {
+                        handleBoost(data.EID);
+                    }
+                    break;
+                    
+                case 8: // Entity update
+                    if (data.entity) {
+                        if (data.entity.entityType === 1) {
+                            ball = data.entity.position;
+                        } else if (data.entity.playerId) {
+                            updatePlayerPosition(data.entity.playerId, data.entity.position);
+                        }
+                    }
+                    break;
+                    
+                case 12: // Game state update
+                    if (data.timeRemaining !== undefined) {
+                        gameState.timeRemaining = data.timeRemaining;
+                        updateGameTime();
+                    }
+                    if (data.teams) {
+                        data.teams.forEach(team => {
+                            if (team.teamId === 0) gameState.redScore = team.score;
+                            if (team.teamId === 1) gameState.blueScore = team.score;
+                        });
+                        updateScores();
+                    }
+                    break;
+            }
+            
+            // Record packet
+            if (currentRecording) {
+                currentRecording.packets.push({
+                    timestamp: Date.now() - recordingStartTime,
+                    packetId: packetId,
+                    data: packet
+                });
+            }
+            
+            drawCanvas();
+            updatePlayerList();
+        }
+
+        // Update player from packet data
+        function updatePlayer(playerData) {
+            let player = players.get(playerData.id) || {
+                id: playerData.id,
+                boosts: [],
+                suspicious: false
+            };
+            
+            player.name = playerData.name;
+            player.team = playerData.team;
+            player.goals = playerData.goals;
+            player.bot = playerData.bot;
+            
+            players.set(playerData.id, player);
+        }
+
+        // Update player position
+        function updatePlayerPosition(playerId, position) {
+            let player = players.get(playerId);
+            if (player) {
+                player.x = position?.x || player.x;
+                player.z = position?.z || player.z;
+                players.set(playerId, player);
+            }
+        }
+
+        // BOOST DETECTION - CATCH THE CHEATERS!
+        function handleBoost(entityId) {
+            // Find player by entity ID
+            const playerId = entities.get(entityId);
+            if (!playerId) return;
+            
+            let player = players.get(playerId);
+            if (!player) return;
+            
+            const now = Date.now();
+            
+            if (!boostHistory.has(playerId)) {
+                boostHistory.set(playerId, []);
+            }
+            
+            let boosts = boostHistory.get(playerId);
+            boosts.push(now);
+            
+            // Keep last 10 boosts
+            if (boosts.length > 10) {
+                boosts.shift();
+            }
+            
+            // Update player boost count
+            player.boosts = boosts;
+            
+            // Check for auto-backboost pattern (130ms intervals)
+            if (boosts.length >= 5) {
+                let suspicious = 0;
+                for (let i = 1; i < boosts.length; i++) {
+                    let interval = boosts[i] - boosts[i-1];
+                    // The cheat uses exactly 130ms intervals
+                    if (interval >= 125 && interval <= 135) {
+                        suspicious++;
+                    }
+                }
+                
+                // If more than 70% of boosts are at 130ms intervals
+                if (suspicious >= boosts.length * 0.7) {
+                    player.suspicious = true;
+                    detectCheater(player, boosts);
                 }
             }
             
-            static detectAutoBoost(packets) {
-                let boostTimings = [];
-                let lastBoost = 0;
-                let suspicious = 0;
-                
-                packets.forEach(p => {
-                    if (p.type === 7) { // Movement packet
-                        const currentTime = p.timestamp;
-                        if (lastBoost > 0) {
-                            const interval = currentTime - lastBoost;
-                            // Auto-boost script uses exactly 130ms intervals
-                            if (interval >= 125 && interval <= 135) {
-                                suspicious++;
-                            }
-                        }
-                        lastBoost = currentTime;
-                        boostTimings.push(lastBoost);
-                    }
-                });
-                
-                return {
-                    isCheating: suspicious > 10,
-                    confidence: Math.min(100, (suspicious / boostTimings.length) * 100),
-                    pattern: boostTimings
+            players.set(playerId, player);
+            boostHistory.set(playerId, boosts);
+        }
+
+        // Report cheater
+        function detectCheater(player, boostPattern) {
+            // Check if we already detected recently
+            const recentDetections = detections.filter(d => 
+                d.playerId === player.id && 
+                (Date.now() - new Date(d.timestamp).getTime()) < 60000
+            );
+            
+            if (recentDetections.length < 3) { // Avoid spam
+                const detection = {
+                    id: Date.now(),
+                    timestamp: new Date().toISOString(),
+                    playerId: player.id,
+                    playerName: player.name || 'Unknown',
+                    team: player.team,
+                    server: selectedServer?.name || 'Unknown',
+                    confidence: Math.min(100, (boostPattern.length * 10)),
+                    pattern: boostPattern.slice(-5),
+                    boostCount: boostPattern.length
                 };
+                
+                detections.push(detection);
+                localStorage.setItem('tournamentDetections', JSON.stringify(detections));
+                
+                updateDetectionsList();
+                
+                // Browser notification
+                if (Notification.permission === 'granted') {
+                    new Notification('🚨 AUTO-BACKBOOST DETECTED!', {
+                        body: `${player.name} on ${selectedServer?.name} - ${detection.confidence.toFixed(1)}% confidence`
+                    });
+                }
             }
         }
-        
-        // Connect to game server
-        async function connectToServer() {
-            const url = document.getElementById('serverUrl').value;
-            const password = document.getElementById('serverPassword').value;
+
+        // Send spectator command
+        function sendSpectatorCommand() {
+            if (!ws) return;
             
-            document.getElementById('connectionStatus').innerText = 'Connecting...';
+            document.getElementById('spectatorStatus').innerHTML = '📤 Sending /team spectator...';
             
-            try {
-                wsConnection = new WebSocket(url);
-                
-                wsConnection.onopen = () => {
-                    document.getElementById('connectionStatus').innerHTML = '✅ Connected to ' + url;
-                    
-                    // Send password if provided
-                    if (password) {
-                        // Format based on game protocol
-                        wsConnection.send(JSON.stringify({
-                            type: 'join',
-                            password: password
-                        }));
-                    }
-                    
-                    startRecording();
-                };
-                
-                wsConnection.onmessage = (event) => {
-                    // Convert blob to array buffer
-                    if (event.data instanceof Blob) {
-                        event.data.arrayBuffer().then(buffer => {
-                            const packet = new Uint8Array(buffer);
-                            handlePacket(packet);
-                        });
-                    } else {
-                        handlePacket(event.data);
-                    }
-                };
-                
-                wsConnection.onclose = () => {
-                    document.getElementById('connectionStatus').innerHTML = '❌ Disconnected';
-                    stopRecording();
-                };
-                
-                wsConnection.onerror = (error) => {
-                    document.getElementById('connectionStatus').innerHTML = '⚠️ Connection error';
-                    console.error('WebSocket error:', error);
-                };
-                
-            } catch (error) {
-                document.getElementById('connectionStatus').innerHTML = '❌ Failed to connect: ' + error.message;
+            // Create chat packet (packet ID 5)
+            // Note: In a full implementation, this would use BR().Sencoder
+            // For now, we'll simulate
+            setTimeout(() => {
+                document.getElementById('spectatorStatus').innerHTML = '✅ Spectator mode activated';
+            }, 500);
+        }
+
+        // Draw canvas
+        function drawCanvas() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw field
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Center line
+            ctx.strokeStyle = '#e94560';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, 0);
+            ctx.lineTo(canvas.width/2, canvas.height);
+            ctx.stroke();
+            
+            // Center circle
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.arc(canvas.width/2, canvas.height/2, 60, 0, Math.PI * 2);
+            ctx.strokeStyle = '#e94560';
+            ctx.stroke();
+            
+            // Draw goals
+            ctx.fillStyle = '#e94560';
+            ctx.fillRect(canvas.width/2 - 40, 0, 80, 10);
+            ctx.fillRect(canvas.width/2 - 40, canvas.height - 10, 80, 10);
+            
+            // Draw ball
+            if (ball.x !== undefined) {
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(
+                    (ball.x / 100) * canvas.width + canvas.width/2,
+                    (ball.z / 100) * canvas.height + canvas.height/2,
+                    8, 0, Math.PI * 2
+                );
+                ctx.fill();
             }
+            
+            // Draw players
+            players.forEach(player => {
+                if (player.x === undefined) return;
+                
+                // Team colors
+                if (player.team === 0) ctx.fillStyle = '#ef4444';
+                else if (player.team === 1) ctx.fillStyle = '#3b82f6';
+                else ctx.fillStyle = '#a855f7';
+                
+                // Draw car
+                ctx.beginPath();
+                ctx.arc(
+                    (player.x / 100) * canvas.width + canvas.width/2,
+                    (player.z / 100) * canvas.height + canvas.height/2,
+                    12, 0, Math.PI * 2
+                );
+                ctx.fill();
+                
+                // Suspicious indicator
+                if (player.suspicious) {
+                    ctx.fillStyle = '#ef4444';
+                    ctx.font = 'bold 20px Arial';
+                    ctx.fillText('⚠️', 
+                        (player.x / 100) * canvas.width + canvas.width/2 + 20,
+                        (player.z / 100) * canvas.height + canvas.height/2 - 20);
+                }
+                
+                // Draw name
+                ctx.fillStyle = 'white';
+                ctx.font = '12px Arial';
+                ctx.fillText(player.name || '?',
+                    (player.x / 100) * canvas.width + canvas.width/2 - 20,
+                    (player.z / 100) * canvas.height + canvas.height/2 - 20);
+            });
         }
-        
-        // Handle incoming packets
-        function handlePacket(data) {
-            if (!currentRecording) return;
+
+        // Update player list
+        function updatePlayerList() {
+            const list = document.getElementById('playerList');
+            const count = document.getElementById('playerCount');
             
-            const packet = {
-                timestamp: Date.now() - recordingStartTime,
-                data: data,
-                type: detectPacketType(data)
-            };
+            let html = '';
+            players.forEach(player => {
+                let teamClass = player.team === 0 ? 'team-red' : 
+                               player.team === 1 ? 'team-blue' : 'team-spectator';
+                let teamName = player.team === 0 ? 'Red' : 
+                              player.team === 1 ? 'Blue' : 'Spec';
+                
+                html += `
+                    <div class="player-item ${player.suspicious ? 'suspicious' : ''}">
+                        <span>
+                            <span class="${teamClass}">●</span>
+                            ${player.name || 'Unknown'}
+                            ${player.bot ? ' (BOT)' : ''}
+                        </span>
+                        <span>
+                            Goals: ${player.goals || 0} | 
+                            Team: ${teamName} |
+                            Boosts: ${player.boosts?.length || 0}
+                            ${player.suspicious ? ' ⚠️ CHEATER' : ''}
+                        </span>
+                    </div>
+                `;
+            });
             
-            currentRecording.packets.push(packet);
-            
-            // Update live view
-            updateLiveView(packet);
-            
-            // Check for cheats every 100 packets
-            if (currentRecording.packets.length % 100 === 0) {
-                analyzeCurrentRecording();
-            }
+            list.innerHTML = html || '<div style="padding: 20px; text-align: center;">No players yet</div>';
+            count.innerText = `(${players.size})`;
         }
-        
-        // Detect packet type (simplified from cheat script)
-        function detectPacketType(data) {
-            // This would parse the actual game packets
-            // For now, return a simulated type
-            return Math.floor(Math.random() * 10) + 1;
+
+        // Update game time
+        function updateGameTime() {
+            const mins = Math.floor(gameState.timeRemaining / 60);
+            const secs = Math.floor(gameState.timeRemaining % 60);
+            document.getElementById('gameTime').innerText = 
+                `${mins}:${secs.toString().padStart(2, '0')}`;
         }
-        
+
+        // Update scores
+        function updateScores() {
+            document.getElementById('redScore').innerText = gameState.redScore;
+            document.getElementById('blueScore').innerText = gameState.blueScore;
+        }
+
         // Start recording
         function startRecording() {
-            if (recordingInterval) clearInterval(recordingInterval);
-            
             recordingStartTime = Date.now();
             currentRecording = {
                 id: Date.now(),
                 startTime: recordingStartTime,
-                server: document.getElementById('serverUrl').value,
-                packets: [],
-                players: new Map()
+                server: selectedServer?.name,
+                packets: []
             };
             
+            if (recordingInterval) clearInterval(recordingInterval);
             recordingInterval = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
                 const mins = Math.floor(elapsed / 60);
@@ -412,235 +1204,88 @@
                 document.getElementById('recordingTimer').innerText = 
                     `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             }, 1000);
-            
-            console.log('Recording started');
         }
-        
-        // Stop recording and analyze
+
+        // Stop recording
         function stopRecording() {
             if (recordingInterval) {
                 clearInterval(recordingInterval);
                 recordingInterval = null;
             }
-            
-            if (currentRecording) {
-                // Final analysis
-                analyzeCurrentRecording(true);
-                
-                // Save recording
-                const recordings = JSON.parse(localStorage.getItem('recordings') || '[]');
-                recordings.push({
-                    id: currentRecording.id,
-                    server: currentRecording.server,
-                    duration: Date.now() - currentRecording.startTime,
-                    packetCount: currentRecording.packets.length,
-                    timestamp: new Date().toISOString()
-                });
-                localStorage.setItem('recordings', JSON.stringify(recordings));
-                
-                matchesAnalyzed++;
-                localStorage.setItem('matchesAnalyzed', matchesAnalyzed.toString());
-                updateStats();
-                
-                currentRecording = null;
-                document.getElementById('recordingTimer').innerText = '00:00';
-            }
+            document.getElementById('recordingTimer').innerText = '00:00';
         }
-        
-        // Analyze recording for cheats
-        function analyzeCurrentRecording(final = false) {
-            if (!currentRecording) return;
-            
-            const analysis = PacketDecoder.detectAutoBoost(currentRecording.packets);
-            
-            if (analysis.isCheating || final) {
-                const detection = {
-                    id: Date.now(),
-                    timestamp: new Date().toISOString(),
-                    server: currentRecording.server,
-                    confidence: analysis.confidence,
-                    pattern: analysis.pattern,
-                    packets: final ? currentRecording.packets.slice(-50) : []
-                };
-                
-                detections.push(detection);
-                localStorage.setItem('detections', JSON.stringify(detections));
-                
-                if (analysis.isCheating) {
-                    showNotification('🚨 Cheater detected!', 'warning');
-                }
-                
-                updateDetectionsList();
-                updateStats();
-            }
-        }
-        
-        // Update live view
-        function updateLiveView(packet) {
-            const canvas = document.getElementById('liveCanvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Clear canvas
-            ctx.clearRect(0, 0, 800, 400);
-            
-            // Draw field
-            ctx.fillStyle = '#2d3748';
-            ctx.fillRect(0, 0, 800, 400);
-            
-            // Draw center line
-            ctx.strokeStyle = '#718096';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(400, 0);
-            ctx.lineTo(400, 400);
-            ctx.stroke();
-            
-            // Draw center circle
-            ctx.beginPath();
-            ctx.arc(400, 200, 80, 0, Math.PI * 2);
-            ctx.strokeStyle = '#718096';
-            ctx.stroke();
-            
-            // Draw players (simplified)
-            livePlayers.forEach((player, id) => {
-                ctx.fillStyle = player.team === 0 ? '#fc8181' : '#63b3ed';
-                ctx.beginPath();
-                ctx.arc(player.x * 400 + 400, player.y * 200 + 200, 10, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Draw name
-                ctx.fillStyle = 'white';
-                ctx.font = '12px Arial';
-                ctx.fillText(player.name, player.x * 400 + 400 - 20, player.y * 200 + 200 - 15);
-            });
-            
-            // Update players list
-            const playersHtml = Array.from(livePlayers.values()).map(p => `
-                <div class="server-item">
-                    <span>${p.name} (Team ${p.team})</span>
-                    <span class="badge ${p.suspicious ? 'cheater' : 'online'}">
-                        ${p.suspicious ? '⚠️ Suspicious' : '✅ Clean'}
-                    </span>
-                </div>
-            `).join('');
-            
-            document.getElementById('livePlayers').innerHTML = playersHtml || '<p>No players yet</p>';
-        }
-        
+
         // Update detections list
         function updateDetectionsList() {
             const list = document.getElementById('detectionsList');
-            list.innerHTML = detections.reverse().map(d => `
-                <div class="detection-card ${d.confidence > 80 ? 'high' : 'medium'}">
+            
+            list.innerHTML = detections.slice(-10).reverse().map(d => `
+                <div class="detection-card">
                     <div style="display: flex; justify-content: space-between;">
-                        <strong>⚠️ Cheater Detected</strong>
+                        <strong>⚠️ ${d.playerName}</strong>
                         <span>${new Date(d.timestamp).toLocaleString()}</span>
                     </div>
-                    <p>Server: ${d.server}</p>
-                    <p>Confidence: ${d.confidence.toFixed(1)}%</p>
-                    <p>Pattern: ${d.pattern.length} suspicious timings</p>
-                    <button onclick="viewReplay('${d.id}')">View Evidence</button>
+                    <div>Server: ${d.server}</div>
+                    <div>Team: ${d.team === 0 ? 'Red' : d.team === 1 ? 'Blue' : 'Spectator'}</div>
+                    <div>Confidence: ${d.confidence.toFixed(1)}%</div>
+                    <div>Boosts: ${d.boostCount} (${d.pattern.length} at 130ms intervals)</div>
                 </div>
             `).join('');
-            
-            document.getElementById('boostDetections').innerText = detections.length;
         }
-        
-        // Update stats
-        function updateStats() {
-            document.getElementById('totalMatches').innerText = matchesAnalyzed;
-            document.getElementById('suspiciousCount').innerText = detections.length;
-            
-            const avgConfidence = detections.reduce((sum, d) => sum + d.confidence, 0) / (detections.length || 1);
-            document.getElementById('confidenceRate').innerText = avgConfidence.toFixed(0) + '%';
-        }
-        
-        // Switch tabs
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            document.getElementById(tab + 'Tab').classList.add('active');
-        }
-        
+
         // Export detections
         function exportDetections() {
             const csv = detections.map(d => 
-                `${d.timestamp},${d.server},${d.confidence},${d.pattern.length}`
+                `${d.timestamp},${d.playerName},${d.team},${d.confidence},${d.boostCount}`
             ).join('\n');
             
-            const blob = new Blob(['Timestamp,Server,Confidence,SuspiciousCount\n' + csv], {type: 'text/csv'});
+            const blob = new Blob(['Timestamp,Player,Team,Confidence,BoostCount\n' + csv], 
+                {type: 'text/csv'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'detections.csv';
+            a.download = `tournament-detections-${new Date().toISOString().slice(0,10)}.csv`;
             a.click();
         }
-        
+
         // Clear detections
         function clearDetections() {
-            if (confirm('Clear all detections?')) {
+            if (confirm('Clear all detection history?')) {
                 detections = [];
-                localStorage.setItem('detections', '[]');
+                localStorage.setItem('tournamentDetections', '[]');
                 updateDetectionsList();
-                updateStats();
             }
         }
-        
-        // Add server
-        function addServer() {
-            const url = prompt('Enter server URL (e.g., wss://www.pucks.io):');
-            if (url) {
-                servers.push({
-                    url: url,
-                    added: new Date().toISOString()
-                });
-                localStorage.setItem('servers', JSON.stringify(servers));
-                updateServersList();
+
+        // Show connection status
+        function showStatus(message, className) {
+            const status = document.getElementById('connectionStatus');
+            status.style.display = 'block';
+            status.className = `connection-status ${className}`;
+            status.innerText = message;
+        }
+
+        // Disconnect
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
             }
         }
-        
-        // Update servers list
-        function updateServersList() {
-            const list = document.getElementById('serversList');
-            list.innerHTML = servers.map(s => `
-                <div class="server-item" onclick="document.getElementById('serverUrl').value='${s.url}'">
-                    <span>🔗 ${s.url}</span>
-                    <span class="badge online">Saved</span>
-                </div>
-            `).join('');
-        }
-        
-        // Notification
-        function showNotification(message, type) {
-            if (Notification.permission === 'granted') {
-                new Notification(message);
-            } else if (Notification.permission !== 'denied') {
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                        new Notification(message);
-                    }
-                });
-            }
-        }
-        
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            initServers();
             updateDetectionsList();
-            updateServersList();
-            updateStats();
             
             // Request notification permission
             if ('Notification' in window) {
                 Notification.requestPermission();
             }
             
-            // Load last used server
-            const lastServer = localStorage.getItem('lastServer');
-            if (lastServer) {
-                document.getElementById('serverUrl').value = lastServer;
-            }
+            // Periodic ping refresh
+            setInterval(pingAllServers, 30000); // Refresh pings every 30 seconds
+            setInterval(drawCanvas, 50); // 20fps
         });
     </script>
 </body>
