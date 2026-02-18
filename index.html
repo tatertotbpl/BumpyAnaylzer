@@ -477,8 +477,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v6.0</h1>
-        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Fixed Authentication</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v7.0</h1>
+        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Manual Packet Building</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -610,7 +610,7 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v6.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            TOURNAMENT ANTI-CHEAT SYSTEM v7.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
             © 2024 Tournament Anti-Cheat • Password: rodshot (configurable)
         </div>
     </div>
@@ -646,114 +646,36 @@
             }
         };
 
-        // ==================== PACKET DECODER/ENCODER ====================
-        class BR {
-            constructor(arr) {
-                this.arr = arr || [];
-                this.i = 0;
+        // ==================== SIMPLE BYTE WRITER ====================
+        class ByteWriter {
+            constructor() {
+                this.bytes = [];
             }
             
-            skip() { return this.arr.length - this.i; }
-            
-            rbs(size) {
-                let r = this.arr.slice(this.i, this.i + size);
-                this.i += size;
-                return r;
+            writeByte(byte) {
+                this.bytes.push(byte & 0xFF);
             }
             
-            rb() { return this.rbs(1)[0]; }
-            
-            int7() {
-                let r = 0, b = 0;
-                while (b !== 35) {
-                    let c = this.rb();
-                    r |= (c & 127) << b;
-                    if ((c & 128) === 0) return [r, (b / 7) + 1];
-                    b += 7;
-                }
-                return [r, 5];
+            writeBytes(arr) {
+                this.bytes.push(...arr);
             }
             
-            writeInt7(num) {
-                let bytes = [];
+            writeVarInt(num) {
                 while (num >= 128) {
-                    bytes.push((num & 127) | 128);
+                    this.bytes.push((num & 127) | 128);
                     num = Math.floor(num / 128);
                 }
-                bytes.push(num & 127);
-                return bytes;
+                this.bytes.push(num & 127);
             }
             
-            str() {
-                let l = this.int7()[0];
-                return new TextDecoder().decode(new Uint8Array(this.rbs(l)));
+            writeString(str) {
+                let strBytes = new TextEncoder().encode(str);
+                this.writeVarInt(strBytes.length);
+                this.writeBytes(strBytes);
             }
             
-            f32() {
-                return new Float32Array(new Uint8Array(this.rbs(4)).buffer)[0];
-            }
-            
-            // Simple encode function that just writes bytes in order
-            encode(packet) {
-                let bytes = [];
-                let keys = Object.keys(packet).sort((a, b) => parseInt(a) - parseInt(b));
-                
-                for (let byteKey of keys) {
-                    let [keyName, valueType, value] = packet[byteKey];
-                    let byteNum = parseInt(byteKey);
-                    
-                    bytes.push(byteNum);
-                    
-                    switch(valueType) {
-                        case "int": case "uint": case "bool":
-                            bytes.push(...this.writeInt7(value));
-                            break;
-                        case "string":
-                            let strBytes = new TextEncoder().encode(value);
-                            bytes.push(...this.writeInt7(strBytes.length));
-                            bytes.push(...strBytes);
-                            break;
-                        case "float":
-                            let arr = new Float32Array([value]);
-                            bytes.push(...new Uint8Array(arr.buffer));
-                            break;
-                        case "dict":
-                            // For dict, we need to encode its contents
-                            let dictBytes = this.encodeDict(value);
-                            bytes.push(...this.writeInt7(dictBytes.length));
-                            bytes.push(...dictBytes);
-                            break;
-                    }
-                }
-                return bytes;
-            }
-            
-            encodeDict(dict) {
-                let bytes = [];
-                let keys = Object.keys(dict).sort((a, b) => parseInt(a) - parseInt(b));
-                
-                for (let byteKey of keys) {
-                    let [keyName, valueType, value] = dict[byteKey];
-                    let byteNum = parseInt(byteKey);
-                    
-                    bytes.push(byteNum);
-                    
-                    switch(valueType) {
-                        case "int": case "uint": case "bool":
-                            bytes.push(...this.writeInt7(value));
-                            break;
-                        case "string":
-                            let strBytes = new TextEncoder().encode(value);
-                            bytes.push(...this.writeInt7(strBytes.length));
-                            bytes.push(...strBytes);
-                            break;
-                        case "float":
-                            let arr = new Float32Array([value]);
-                            bytes.push(...new Uint8Array(arr.buffer));
-                            break;
-                    }
-                }
-                return bytes;
+            getPacket() {
+                return new Uint8Array(this.bytes);
             }
         }
 
@@ -890,52 +812,73 @@
             return result;
         }
 
+        function buildAuthPacket(username, uid, password) {
+            const writer = new ByteWriter();
+            
+            // Build the data dictionary first (fields 10, 18, 32, 56)
+            const dataWriter = new ByteWriter();
+            
+            // Field 10: name (string)
+            dataWriter.writeByte(10);
+            dataWriter.writeString(username);
+            
+            // Field 18: uid (string)
+            dataWriter.writeByte(18);
+            dataWriter.writeString(uid);
+            
+            // Field 32: skinId (uint) - 230
+            dataWriter.writeByte(32);
+            dataWriter.writeVarInt(230);
+            
+            // Field 56: authenticationMethod (string) - password
+            dataWriter.writeByte(56);
+            dataWriter.writeString(password);
+            
+            const dataBytes = dataWriter.getPacket();
+            
+            // Now build the full packet with multiplex header
+            const packetWriter = new ByteWriter();
+            
+            // Multiplex header (0x0A)
+            packetWriter.writeByte(0x0A);
+            
+            // Field 8: PacketId = 1
+            packetWriter.writeByte(8);
+            packetWriter.writeVarInt(1);
+            
+            // Field 18: Data (the dictionary we built)
+            packetWriter.writeByte(18);
+            packetWriter.writeVarInt(dataBytes.length);
+            packetWriter.writeBytes(dataBytes);
+            
+            return packetWriter.getPacket();
+        }
+
         function sendAuthentication(password) {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 addLog('[ERROR] Cannot authenticate - WebSocket not open', 'error');
                 return;
             }
             
-            addLog('[AUTH] Sending authentication packet...', 'info');
+            addLog('[AUTH] Building authentication packet...', 'info');
             
             try {
                 const username = generateUsername();
                 const uid = generateUID();
                 
                 addLog(`[AUTH] Username: ${username}`, 'info');
-                addLog(`[AUTH] UID: ${uid.substring(0, 8)}...`, 'info');
+                addLog(`[AUTH] UID: ${uid}`, 'info');
+                addLog(`[AUTH] Password: ${password}`, 'info');
                 
-                // Build the auth packet manually to ensure correct format
-                // Field 8: PacketId = 1
-                // Field 18: Data dict
-                const encoder = new BR();
+                const packet = buildAuthPacket(username, uid, password);
                 
-                // First encode the inner data dict
-                const dataDict = {
-                    10: ["name", "string", username],
-                    18: ["uid", "string", uid],
-                    32: ["skinId", "uint", 230],
-                    56: ["authenticationMethod", "string", password]
-                };
+                addLog(`[AUTH] Packet size: ${packet.length} bytes`, 'info');
                 
-                const dataBytes = encoder.encodeDict(dataDict);
+                // Log full hex for debugging
+                const hexFull = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                addLog(`[AUTH] Packet hex: ${hexFull}`, 'info');
                 
-                // Now build the full packet with field 8 and field 18
-                const packetBytes = [
-                    8, ...encoder.writeInt7(1), // PacketId = 1
-                    18, ...encoder.writeInt7(dataBytes.length), ...dataBytes // Data dict
-                ];
-                
-                // Add multiplex header
-                const finalPacket = new Uint8Array([10, ...packetBytes]);
-                
-                addLog(`[AUTH] Packet size: ${finalPacket.length} bytes`, 'info');
-                
-                // Log hex for debugging
-                const hexPreview = Array.from(finalPacket.slice(0, 20)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                addLog(`[AUTH] Packet preview: ${hexPreview}...`, 'info');
-                
-                ws.send(finalPacket);
+                ws.send(packet);
                 
             } catch (e) {
                 addLog(`[ERROR] Authentication failed: ${e.message}`, 'error');
@@ -943,6 +886,34 @@
         }
 
         // ==================== SPECTATOR COMMAND ====================
+        function buildChatPacket(message) {
+            const writer = new ByteWriter();
+            
+            // Build the data dictionary first (fields 8 and 18)
+            const dataWriter = new ByteWriter();
+            
+            // Field 8: playerId (uint) - 0 for system
+            dataWriter.writeByte(8);
+            dataWriter.writeVarInt(0);
+            
+            // Field 18: message (string)
+            dataWriter.writeByte(18);
+            dataWriter.writeString(message);
+            
+            const dataBytes = dataWriter.getPacket();
+            
+            // Build full packet
+            const packetWriter = new ByteWriter();
+            packetWriter.writeByte(0x0A); // multiplex header
+            packetWriter.writeByte(8); // field 8 - PacketId
+            packetWriter.writeVarInt(5); // PacketId = 5 (chat)
+            packetWriter.writeByte(18); // field 18 - Data
+            packetWriter.writeVarInt(dataBytes.length);
+            packetWriter.writeBytes(dataBytes);
+            
+            return packetWriter.getPacket();
+        }
+
         function sendSpectatorCommand() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
@@ -953,24 +924,9 @@
             document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
             
             try {
-                // Build chat packet (Packet ID 5)
-                const encoder = new BR();
-                
-                const chatDataDict = {
-                    8: ["playerId", "uint", 0],
-                    18: ["message", "string", "/team spectator"]
-                };
-                
-                const chatDataBytes = encoder.encodeDict(chatDataDict);
-                
-                const chatPacketBytes = [
-                    8, ...encoder.writeInt7(5), // PacketId = 5
-                    18, ...encoder.writeInt7(chatDataBytes.length), ...chatDataBytes
-                ];
-                
-                const finalPacket = new Uint8Array([10, ...chatPacketBytes]);
-                
-                ws.send(finalPacket);
+                const packet = buildChatPacket('/team spectator');
+                addLog(`[SPECTATOR] Packet size: ${packet.length} bytes`, 'info');
+                ws.send(packet);
                 
                 addLog('[SPECTATOR] Command sent successfully', 'success');
                 document.getElementById('spectatorStatus').innerHTML = '✅ SPECTATOR MODE';
@@ -1046,6 +1002,10 @@
                     
                     addLog(`[DEBUG] Packet ${packetCount}: type=${data[1]}, length=${data.length}`, 'info');
                     
+                    // Log first few bytes of each packet
+                    const hexPreview = Array.from(data.slice(0, Math.min(20, data.length))).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                    addLog(`[DEBUG] Packet data: ${hexPreview}...`, 'info');
+                    
                     // If we receive packet type 2 (game state), we're authenticated!
                     if (data[1] === 2 && !authenticated) {
                         authenticated = true;
@@ -1053,16 +1013,8 @@
                         
                         // Now send spectator command if auto-spectator is enabled
                         if (document.getElementById('autoSpectator').checked) {
-                            setTimeout(sendSpectatorCommand, 500);
+                            setTimeout(sendSpectatorCommand, 1000);
                         }
-                    }
-                    
-                    // Try to decode the packet
-                    try {
-                        // Simple packet decoding would go here
-                        // For now, just log that we received it
-                    } catch (e) {
-                        // Ignore decode errors
                     }
                 };
                 
@@ -1114,9 +1066,11 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
+            // Draw field
             ctx.fillStyle = '#0a0a0f';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
+            // Center line
             ctx.strokeStyle = '#e94560';
             ctx.lineWidth = 2;
             ctx.setLineDash([10, 10]);
@@ -1125,15 +1079,68 @@
             ctx.lineTo(canvas.width/2, canvas.height);
             ctx.stroke();
             
+            // Center circle
             ctx.setLineDash([]);
             ctx.beginPath();
             ctx.arc(canvas.width/2, canvas.height/2, 80, 0, Math.PI * 2);
             ctx.strokeStyle = '#e94560';
             ctx.stroke();
             
+            // Goals
             ctx.fillStyle = '#e94560';
             ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
             ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
+            
+            // Ball
+            if (ball.x !== undefined && ball.z !== undefined) {
+                ctx.fillStyle = 'white';
+                ctx.shadowColor = 'white';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.arc(
+                    (ball.x / 100) * canvas.width + canvas.width/2,
+                    (ball.z / 100) * canvas.height + canvas.height/2,
+                    10, 0, Math.PI * 2
+                );
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            
+            // Players
+            players.forEach(player => {
+                if (player.x === undefined || player.z === undefined) return;
+                
+                if (player.team === 0) ctx.fillStyle = '#ef4444';
+                else if (player.team === 1) ctx.fillStyle = '#3b82f6';
+                else ctx.fillStyle = '#a855f7';
+                
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.arc(
+                    (player.x / 100) * canvas.width + canvas.width/2,
+                    (player.z / 100) * canvas.height + canvas.height/2,
+                    14, 0, Math.PI * 2
+                );
+                ctx.fill();
+                
+                if (player.suspicious) {
+                    ctx.fillStyle = '#ef4444';
+                    ctx.font = 'bold 24px Arial';
+                    ctx.shadowColor = '#ef4444';
+                    ctx.fillText('⚠️', 
+                        (player.x / 100) * canvas.width + canvas.width/2 + 25,
+                        (player.z / 100) * canvas.height + canvas.height/2 - 25);
+                }
+                
+                ctx.shadowBlur = 0;
+                
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px Arial';
+                ctx.fillText(player.name || '?',
+                    (player.x / 100) * canvas.width + canvas.width/2 - 30,
+                    (player.z / 100) * canvas.height + canvas.height/2 - 30);
+            });
         }
 
         function updatePlayerList() {
@@ -1141,8 +1148,37 @@
             const count = document.getElementById('playerCount');
             if (!list) return;
             
-            list.innerHTML = '<div style="padding: 20px; text-align: center; color: #6b7280;">Waiting for game data...</div>';
-            if (count) count.innerText = '(0)';
+            let html = '';
+            players.forEach(player => {
+                let teamClass = player.team === 0 ? 'team-red' : 
+                               player.team === 1 ? 'team-blue' : 'team-spectator';
+                let teamName = player.team === 0 ? 'RED' : 
+                              player.team === 1 ? 'BLUE' : 'SPEC';
+                
+                let boostInfo = boostHistory.get(player.id) || [];
+                let suspiciousRate = boostInfo.length > 0 ? 
+                    (boostInfo.filter((b, i, arr) => i > 0 && (b - arr[i-1]) >= 125 && (b - arr[i-1]) <= 135).length / boostInfo.length * 100).toFixed(1) : 0;
+                
+                html += `
+                    <div class="player-item ${player.suspicious ? 'suspicious' : ''}">
+                        <span>
+                            <span class="${teamClass}">●</span>
+                            <strong>${player.name || 'Unknown'}</strong>
+                            ${player.bot ? '<span class="badge badge-clean">BOT</span>' : ''}
+                            ${player.suspicious ? '<span class="badge badge-cheater">CHEATER</span>' : ''}
+                        </span>
+                        <span>
+                            Goals: ${player.goals || 0} | 
+                            Team: ${teamName} |
+                            Boosts: ${boostInfo.length} |
+                            Pattern: ${suspiciousRate}%
+                        </span>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html || '<div style="padding: 20px; text-align: center; color: #6b7280;">No active players</div>';
+            if (count) count.innerText = `(${players.size})`;
         }
 
         function updateGameTime() {
@@ -1263,7 +1299,7 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v6.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v7.0 initialized', 'success');
             addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
         });
