@@ -615,35 +615,35 @@
     </div>
 
     <script>
-        // ==================== TOURNAMENT SERVERS CONFIGURATION ====================
-        const TOURNAMENT_SERVERS = {
-            'ny': {
-                name: 'NEW YORK TOURNAMENT',
-                location: 'New York, USA',
-                flag: '🇺🇸',
-                color: '#ef4444',
-                websockets: [
-                    'wss://community-01.usemapsettings.com:8086',
-                    'wss://community-01.usemapsettings.com:8087',
-                    'wss://community-01.usemapsettings.com:8088',
-                    'wss://community-01.usemapsettings.com:8089'
-                ],
-                displayNames: ['NY-8086', 'NY-8087', 'NY-8088', 'NY-8089']
-            },
-            'fra': {
-                name: 'FRANKFURT TOURNAMENT',
-                location: 'Frankfurt, Germany',
-                flag: '🇩🇪',
-                color: '#3b82f6',
-                websockets: [
-                    'wss://community-02.usemapsettings.com:8086',
-                    'wss://community-02.usemapsettings.com:8087',
-                    'wss://community-02.usemapsettings.com:8088',
-                    'wss://community-02.usemapsettings.com:8089'
-                ],
-                displayNames: ['FRA-8086', 'FRA-8087', 'FRA-8088', 'FRA-8089']
-            }
-        };
+// ==================== TOURNAMENT SERVERS CONFIGURATION ====================
+const TOURNAMENT_SERVERS = {
+    'ny': {
+        name: 'NEW YORK TOURNAMENT',
+        location: 'New York, USA',
+        flag: '🇺🇸',
+        color: '#ef4444',
+        websockets: [
+            'wss://community-01.usemapsettings.com:8086/server',
+            'wss://community-01.usemapsettings.com:8087/server',
+            'wss://community-01.usemapsettings.com:8088/server',
+            'wss://community-01.usemapsettings.com:8089/server'
+        ],
+        displayNames: ['NY-8086', 'NY-8087', 'NY-8088', 'NY-8089']
+    },
+    'fra': {
+        name: 'FRANKFURT TOURNAMENT',
+        location: 'Frankfurt, Germany',
+        flag: '🇩🇪',
+        color: '#3b82f6',
+        websockets: [
+            'wss://community-02.usemapsettings.com:8086/server',
+            'wss://community-02.usemapsettings.com:8087/server',
+            'wss://community-02.usemapsettings.com:8088/server',
+            'wss://community-02.usemapsettings.com:8089/server'
+        ],
+        displayNames: ['FRA-8086', 'FRA-8087', 'FRA-8088', 'FRA-8089']
+    }
+};
 
         // ==================== PACKET DECODER (from cheat script) ====================
         class BR {
