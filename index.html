@@ -995,17 +995,24 @@
 
         // ==================== EXACT WORKING TEAM CHANGE PACKET (from your capture) ====================
         // Working packet: 080d12060802107a
-        function createTeamChangePacket(playerId, team) {
-            // team: 0=red, 1=blue, 2=spectator, 3=ghost
-            let teamBytes = w7bit(team);
-            let idBytes = w7bit(playerId);
-            
-            return new Uint8Array([
-                0x08, 0x0d, 0x12, 0x06,
-                0x08, ...teamBytes,
-                0x10, ...idBytes
-            ]);
-        }
+       function createTeamChangePacket(playerId, team) {
+    // Working packet from game: 080d12060802107a
+    let teamBytes = w7bit(team);
+    let idBytes = w7bit(playerId);
+    
+    // Inner packet (what the game sends)
+    let innerPacket = [
+        0x08, 0x0d, 0x12, 0x06,
+        0x08, ...teamBytes,
+        0x10, ...idBytes
+    ];
+    
+    // Wrap with multiplex header
+    let multiplexHeader = [0x0a];
+    let lengthBytes = w7bit(innerPacket.length);
+    
+    return new Uint8Array([...multiplexHeader, ...lengthBytes, ...innerPacket]);
+}
 
         // ==================== AFK MOVEMENT PACKET ====================
         function createAFKPacket(playerId) {
