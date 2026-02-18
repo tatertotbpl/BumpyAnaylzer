@@ -991,7 +991,7 @@
             addLog('Logs cleared by user', 'warning');
         }
 
-        // ==================== SERVER MANAGEMENT ====================
+    // ==================== SERVER MANAGEMENT ====================
         function initServers() {
             addLog('Initializing tournament server list...', 'info');
             
@@ -1037,19 +1037,24 @@
             pingAllServers();
         }
 
-        async function pingAllServers() {
+        function pingAllServers() {
+            // Clear existing intervals
             pingIntervals.forEach(clearInterval);
             pingIntervals = [];
             
-            await pingServer('ny', 0);
-            await pingServer('ny', 1);
-            await pingServer('ny', 2);
-            await pingServer('ny', 3);
-            await pingServer('fra', 0);
-            await pingServer('fra', 1);
-            await pingServer('fra', 2);
-            await pingServer('fra', 3);
+            addLog('[PING] Testing all tournament servers...', 'info');
             
+            // Ping all servers
+            pingServer('ny', 0);
+            pingServer('ny', 1);
+            pingServer('ny', 2);
+            pingServer('ny', 3);
+            pingServer('fra', 0);
+            pingServer('fra', 1);
+            pingServer('fra', 2);
+            pingServer('fra', 3);
+            
+            // Refresh pings every 30 seconds
             pingIntervals.push(setInterval(() => {
                 pingServer('ny', 0);
                 pingServer('ny', 1);
@@ -1062,37 +1067,48 @@
             }, 30000));
         }
 
-        async function pingServer(region, index) {
+        function pingServer(region, index) {
             const server = TOURNAMENT_SERVERS[region];
             if (!server) return;
             
-            const pingUrl = server.pings[index];
+            const wsUrl = server.websockets[index];
             const statusEl = document.getElementById(`${region}-status-${index}`);
             const pingEl = document.getElementById(`${region}-ping-${index}`);
             
             if (!statusEl || !pingEl) return;
             
             statusEl.className = 'server-status status-checking';
-            pingEl.innerText = 'pinging...';
+            pingEl.innerText = 'checking...';
             
             const start = Date.now();
             
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000);
-                
-                await fetch(pingUrl, { mode: 'no-cors', signal: controller.signal });
-                clearTimeout(timeoutId);
-                
+            // Create test WebSocket connection
+            const testWs = new WebSocket(wsUrl);
+            testWs.binaryType = 'arraybuffer';
+            
+            // Set timeout
+            const timeout = setTimeout(() => {
+                testWs.close();
+                statusEl.className = 'server-status status-offline';
+                pingEl.innerText = 'offline';
+                addLog(`[PING] ${server.displayNames[index]} - timeout (offline)`, 'error');
+            }, 3000);
+            
+            testWs.onopen = () => {
+                clearTimeout(timeout);
                 const ping = Date.now() - start;
                 statusEl.className = 'server-status status-online';
                 pingEl.innerText = `${ping}ms`;
-                addLog(`[PING] ${server.displayNames[index]} - ${ping}ms`, 'success');
-            } catch (e) {
-                statusEl.className = 'server-status status-online';
-                pingEl.innerText = 'online';
-                addLog(`[PING] ${server.displayNames[index]} - online (CORS limited)`, 'info');
-            }
+                addLog(`[PING] ${server.displayNames[index]} - ${ping}ms (online)`, 'success');
+                testWs.close(); // Close immediately after testing
+            };
+            
+            testWs.onerror = () => {
+                clearTimeout(timeout);
+                statusEl.className = 'server-status status-offline';
+                pingEl.innerText = 'offline';
+                addLog(`[PING] ${server.displayNames[index]} - connection failed`, 'error');
+            };
         }
 
         function selectServer(region, index) {
@@ -1123,7 +1139,7 @@
             addLog('[SYSTEM] Manual ping test initiated...', 'info');
             pingAllServers();
         }
-
+        
         // ==================== AUTHENTICATION ====================
         function sendAuthentication(password) {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
