@@ -477,8 +477,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v7.0</h1>
-        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Manual Packet Building</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v8.0</h1>
+        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Exact Packet Replication</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -610,7 +610,7 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v7.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            TOURNAMENT ANTI-CHEAT SYSTEM v8.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
             © 2024 Tournament Anti-Cheat • Password: rodshot (configurable)
         </div>
     </div>
@@ -646,39 +646,85 @@
             }
         };
 
-        // ==================== SIMPLE BYTE WRITER ====================
-        class ByteWriter {
-            constructor() {
-                this.bytes = [];
-            }
+        // ==================== EXACT PACKET BUILDER ====================
+        function buildExactAuthPacket(username, uid, password) {
+            // From working hex: 080112380a0a43617375616c20323932121c786371325a526369495453764e41743744584e5050453749716c763218e6062a07726f6473686f743801
             
-            writeByte(byte) {
-                this.bytes.push(byte & 0xFF);
-            }
+            let usernameBytes = new TextEncoder().encode(username);
+            let uidBytes = new TextEncoder().encode(uid);
+            let pwdBytes = new TextEncoder().encode(password);
             
-            writeBytes(arr) {
-                this.bytes.push(...arr);
-            }
-            writeVarInt(num) {
-    // This matches the game's encoding
-    let bytes = [];
-    while (num >= 128) {
-        bytes.push((num & 127) | 128);
-        num = num >> 7;
-    }
-    bytes.push(num);
-    return bytes;
-}
-        
-            writeString(str) {
-                let strBytes = new TextEncoder().encode(str);
-                this.writeVarInt(strBytes.length);
-                this.writeBytes(strBytes);
-            }
+            // Build exactly like the working packet
+            let packet = [
+                0x0a, // multiplex header
+                0x08, // field 8 - PacketId
+                0x01, // PacketId = 1
+                0x12, // field 18 - Data
+            ];
             
-            getPacket() {
-                return new Uint8Array(this.bytes);
-            }
+            // Calculate data length
+            let dataLength = 
+                2 + usernameBytes.length + // field 10 + length + string
+                2 + uidBytes.length +      // field 18 + length + string
+                2 +                        // field 24 + skinId
+                2 + pwdBytes.length +      // field 42 + length + password
+                0; // No extra field
+            
+            packet.push(dataLength);
+            
+            // Field 10: name
+            packet.push(0x0a);
+            packet.push(usernameBytes.length);
+            packet.push(...usernameBytes);
+            
+            // Field 18: uid
+            packet.push(0x12);
+            packet.push(uidBytes.length);
+            packet.push(...uidBytes);
+            
+            // Field 24: skinId (0x18)
+            packet.push(0x18);
+            packet.push(0xe6); // 230
+            
+            // Field 42: authenticationMethod (0x2a)
+            packet.push(0x2a);
+            packet.push(pwdBytes.length);
+            packet.push(...pwdBytes);
+            
+            // Final field 56: value 1
+            packet.push(0x38);
+            packet.push(0x01);
+            
+            return new Uint8Array(packet);
+        }
+
+        function buildChatPacket(message) {
+            // Simple chat packet structure
+            let msgBytes = new TextEncoder().encode(message);
+            
+            let packet = [
+                0x0a, // multiplex header
+                0x08, // field 8 - PacketId
+                0x05, // PacketId = 5 (chat)
+                0x12, // field 18 - Data
+            ];
+            
+            // Build data dict
+            let dataBytes = [];
+            
+            // Field 8: playerId = 0
+            dataBytes.push(0x08);
+            dataBytes.push(0x00);
+            
+            // Field 18: message
+            dataBytes.push(0x12);
+            dataBytes.push(msgBytes.length);
+            dataBytes.push(...msgBytes);
+            
+            packet.push(dataBytes.length);
+            packet.push(...dataBytes);
+            
+            return new Uint8Array(packet);
         }
 
         // ==================== GAME STATE ====================
@@ -806,54 +852,13 @@
         }
 
         function generateUID() {
+            // Working packet UID is 28 bytes, not 32
             const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let result = '';
-            for (let i = 0; i < 32; i++) {
+            for (let i = 0; i < 28; i++) {
                 result += chars.charAt(Math.floor(Math.random() * chars.length));
             }
             return result;
-        }
-
-        function buildAuthPacket(username, uid, password) {
-            const writer = new ByteWriter();
-            
-            // Build the data dictionary first (fields 10, 18, 32, 56)
-            const dataWriter = new ByteWriter();
-            
-            // Field 10: name (string)
-            dataWriter.writeByte(10);
-            dataWriter.writeString(username);
-            
-            // Field 18: uid (string)
-            dataWriter.writeByte(18);
-            dataWriter.writeString(uid);
-            
-            // Field 32: skinId (uint) - 230
-            dataWriter.writeByte(32);
-            dataWriter.writeVarInt(230);
-            
-            // Field 56: authenticationMethod (string) - password
-            dataWriter.writeByte(56);
-            dataWriter.writeString(password);
-            
-            const dataBytes = dataWriter.getPacket();
-            
-            // Now build the full packet with multiplex header
-            const packetWriter = new ByteWriter();
-            
-            // Multiplex header (0x0A)
-            packetWriter.writeByte(0x0A);
-            
-            // Field 8: PacketId = 1
-            packetWriter.writeByte(8);
-            packetWriter.writeVarInt(1);
-            
-            // Field 18: Data (the dictionary we built)
-            packetWriter.writeByte(18);
-            packetWriter.writeVarInt(dataBytes.length);
-            packetWriter.writeBytes(dataBytes);
-            
-            return packetWriter.getPacket();
         }
 
         function sendAuthentication(password) {
@@ -872,7 +877,7 @@
                 addLog(`[AUTH] UID: ${uid}`, 'info');
                 addLog(`[AUTH] Password: ${password}`, 'info');
                 
-                const packet = buildAuthPacket(username, uid, password);
+                const packet = buildExactAuthPacket(username, uid, password);
                 
                 addLog(`[AUTH] Packet size: ${packet.length} bytes`, 'info');
                 
@@ -885,35 +890,6 @@
             } catch (e) {
                 addLog(`[ERROR] Authentication failed: ${e.message}`, 'error');
             }
-        }
-
-        // ==================== SPECTATOR COMMAND ====================
-        function buildChatPacket(message) {
-            const writer = new ByteWriter();
-            
-            // Build the data dictionary first (fields 8 and 18)
-            const dataWriter = new ByteWriter();
-            
-            // Field 8: playerId (uint) - 0 for system
-            dataWriter.writeByte(8);
-            dataWriter.writeVarInt(0);
-            
-            // Field 18: message (string)
-            dataWriter.writeByte(18);
-            dataWriter.writeString(message);
-            
-            const dataBytes = dataWriter.getPacket();
-            
-            // Build full packet
-            const packetWriter = new ByteWriter();
-            packetWriter.writeByte(0x0A); // multiplex header
-            packetWriter.writeByte(8); // field 8 - PacketId
-            packetWriter.writeVarInt(5); // PacketId = 5 (chat)
-            packetWriter.writeByte(18); // field 18 - Data
-            packetWriter.writeVarInt(dataBytes.length);
-            packetWriter.writeBytes(dataBytes);
-            
-            return packetWriter.getPacket();
         }
 
         function sendSpectatorCommand() {
@@ -1004,7 +980,7 @@
                     
                     addLog(`[DEBUG] Packet ${packetCount}: type=${data[1]}, length=${data.length}`, 'info');
                     
-                    // Log first few bytes of each packet
+                    // Log first few bytes
                     const hexPreview = Array.from(data.slice(0, Math.min(20, data.length))).map(b => b.toString(16).padStart(2, '0')).join(' ');
                     addLog(`[DEBUG] Packet data: ${hexPreview}...`, 'info');
                     
@@ -1030,7 +1006,6 @@
                     else if (event.code === 1003) reason = 'Unsupported data';
                     else if (event.code === 1005) reason = 'No status received';
                     else if (event.code === 1006) reason = 'Abnormal closure - Wrong password?';
-                    else if (event.code === 1008) reason = 'Policy violation';
                     
                     addLog(`[CONNECTION] Disconnected - ${reason}`, 'warning');
                     showStatus('DISCONNECTED', 'status-error');
@@ -1060,7 +1035,12 @@
             }
         }
 
-        // ==================== UI UPDATES ====================
+        // ==================== GAME STATE UPDATES ====================
+        function handleGamePacket(packet) {
+            // This would parse the game packets
+            // For now, just log that we received it
+        }
+
         function drawCanvas() {
             const canvas = document.getElementById('gameCanvas');
             if (!canvas) return;
@@ -1092,57 +1072,6 @@
             ctx.fillStyle = '#e94560';
             ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
             ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
-            
-            // Ball
-            if (ball.x !== undefined && ball.z !== undefined) {
-                ctx.fillStyle = 'white';
-                ctx.shadowColor = 'white';
-                ctx.shadowBlur = 15;
-                ctx.beginPath();
-                ctx.arc(
-                    (ball.x / 100) * canvas.width + canvas.width/2,
-                    (ball.z / 100) * canvas.height + canvas.height/2,
-                    10, 0, Math.PI * 2
-                );
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            }
-            
-            // Players
-            players.forEach(player => {
-                if (player.x === undefined || player.z === undefined) return;
-                
-                if (player.team === 0) ctx.fillStyle = '#ef4444';
-                else if (player.team === 1) ctx.fillStyle = '#3b82f6';
-                else ctx.fillStyle = '#a855f7';
-                
-                ctx.shadowColor = ctx.fillStyle;
-                ctx.shadowBlur = 15;
-                ctx.beginPath();
-                ctx.arc(
-                    (player.x / 100) * canvas.width + canvas.width/2,
-                    (player.z / 100) * canvas.height + canvas.height/2,
-                    14, 0, Math.PI * 2
-                );
-                ctx.fill();
-                
-                if (player.suspicious) {
-                    ctx.fillStyle = '#ef4444';
-                    ctx.font = 'bold 24px Arial';
-                    ctx.shadowColor = '#ef4444';
-                    ctx.fillText('⚠️', 
-                        (player.x / 100) * canvas.width + canvas.width/2 + 25,
-                        (player.z / 100) * canvas.height + canvas.height/2 - 25);
-                }
-                
-                ctx.shadowBlur = 0;
-                
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 12px Arial';
-                ctx.fillText(player.name || '?',
-                    (player.x / 100) * canvas.width + canvas.width/2 - 30,
-                    (player.z / 100) * canvas.height + canvas.height/2 - 30);
-            });
         }
 
         function updatePlayerList() {
@@ -1150,37 +1079,8 @@
             const count = document.getElementById('playerCount');
             if (!list) return;
             
-            let html = '';
-            players.forEach(player => {
-                let teamClass = player.team === 0 ? 'team-red' : 
-                               player.team === 1 ? 'team-blue' : 'team-spectator';
-                let teamName = player.team === 0 ? 'RED' : 
-                              player.team === 1 ? 'BLUE' : 'SPEC';
-                
-                let boostInfo = boostHistory.get(player.id) || [];
-                let suspiciousRate = boostInfo.length > 0 ? 
-                    (boostInfo.filter((b, i, arr) => i > 0 && (b - arr[i-1]) >= 125 && (b - arr[i-1]) <= 135).length / boostInfo.length * 100).toFixed(1) : 0;
-                
-                html += `
-                    <div class="player-item ${player.suspicious ? 'suspicious' : ''}">
-                        <span>
-                            <span class="${teamClass}">●</span>
-                            <strong>${player.name || 'Unknown'}</strong>
-                            ${player.bot ? '<span class="badge badge-clean">BOT</span>' : ''}
-                            ${player.suspicious ? '<span class="badge badge-cheater">CHEATER</span>' : ''}
-                        </span>
-                        <span>
-                            Goals: ${player.goals || 0} | 
-                            Team: ${teamName} |
-                            Boosts: ${boostInfo.length} |
-                            Pattern: ${suspiciousRate}%
-                        </span>
-                    </div>
-                `;
-            });
-            
-            list.innerHTML = html || '<div style="padding: 20px; text-align: center; color: #6b7280;">No active players</div>';
-            if (count) count.innerText = `(${players.size})`;
+            list.innerHTML = '<div style="padding: 20px; text-align: center; color: #6b7280;">Waiting for game data...</div>';
+            if (count) count.innerText = '(0)';
         }
 
         function updateGameTime() {
@@ -1301,7 +1201,7 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v7.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v8.0 initialized', 'success');
             addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
         });
