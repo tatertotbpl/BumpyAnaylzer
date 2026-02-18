@@ -477,7 +477,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v12.0</h1>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v13.0</h1>
         <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Working Spectator • AFK Prevention</div>
         
         <div class="tournament-banner">
@@ -495,7 +495,7 @@
                 <span style="color: #4ade80;" id="spectatorStatus">Ready</span>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button onclick="manualSpectator()" id="manualSpectator" class="secondary">📤 MANUAL SPECTATOR</button>
+                <button onclick="manualSpectator()" id="manualSpectator" class="secondary">📤 GO SPECTATOR</button>
                 <button onclick="toggleAFKPrevention()" id="afkToggle" class="secondary">⏱️ AFK: ON</button>
             </div>
         </div>
@@ -613,8 +613,8 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v12.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
-            Working Spectator Command • AFK Prevention with Dynamic Player ID • Password: rodshot
+            TOURNAMENT ANTI-CHEAT SYSTEM v13.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            Manual Spectator Button • Auto-Spectator Toggle • AFK Prevention • Password: rodshot
         </div>
     </div>
 
@@ -678,8 +678,7 @@
 
         // ==================== SPECTATOR COMMAND ====================
         function createSpectatorPacket() {
-            // This is EXACTLY what the game sends when you type "/team spectator"
-            // No need to simulate Enter - this IS the enter press
+            // EXACT packet the game sends when you type "/team spectator" and press Enter
             let msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
             
             return new Uint8Array([
@@ -908,6 +907,8 @@
         }
 
         function manualSpectator() {
+            // This just sends the spectator command - does NOT disconnect
+            addLog('[MANUAL] Manual spectator command triggered', 'info');
             sendSpectatorCommand();
         }
 
@@ -1032,16 +1033,10 @@
                             addLog(`[AUTH] ✅ Authentication successful! (could not extract ID)`, 'success');
                         }
                         
-                        // Send spectator command
+                        // Send spectator command if auto-spectator is enabled
                         if (document.getElementById('autoSpectator').checked) {
                             setTimeout(sendSpectatorCommand, 1000);
                         }
-                    }
-                    
-                    // Log packet info for debugging
-                    if (packetCount < 5) {
-                        const hexPreview = Array.from(data.slice(0, Math.min(20, data.length))).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                        addLog(`[PACKET ${packetCount}] Type: ${data[1]}, Data: ${hexPreview}...`, 'info');
                     }
                 };
                 
@@ -1241,10 +1236,10 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v12.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v13.0 initialized', 'success');
             addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
-            addLog('[SYSTEM] Spectator command ready - will type /team spectator automatically', 'info');
+            addLog('[SYSTEM] Manual spectator button will NOT disconnect', 'info');
         });
 
         window.addEventListener('beforeunload', () => {
