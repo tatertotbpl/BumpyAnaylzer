@@ -477,8 +477,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v9.0</h1>
-        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Exact Packet Replication</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v10.0</h1>
+        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • AFK Prevention • Auto-Spectator</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -494,7 +494,10 @@
                 </label>
                 <span style="color: #4ade80;" id="spectatorStatus">Ready</span>
             </div>
-            <button onclick="sendSpectatorCommand()" id="manualSpectator" class="secondary">📤 MANUAL SPECTATOR</button>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="sendSpectatorCommand()" id="manualSpectator" class="secondary">📤 MANUAL SPECTATOR</button>
+                <button onclick="toggleAFKPrevention()" id="afkToggle" class="secondary">⏱️ AFK: ON</button>
+            </div>
         </div>
         
         <!-- Server Grid -->
@@ -610,8 +613,8 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v9.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
-            © 2024 Tournament Anti-Cheat • Password: rodshot (configurable)
+            TOURNAMENT ANTI-CHEAT SYSTEM v10.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            AFK Prevention Active • Auto-Spectator Mode • Password: rodshot (configurable)
         </div>
     </div>
 
@@ -647,10 +650,7 @@
         };
 
         // ==================== EXACT PACKET FROM WORKING HEX ====================
-        // Working packet: 080112380a0a43617375616c20323932121c786371325a526369495453764e41743744584e5050453749716c763218e6062a07726f6473686f743801
-        
         function createAuthPacket(username, uid, password) {
-            // Convert strings to byte arrays
             let usernameBytes = [];
             for (let i = 0; i < username.length; i++) {
                 usernameBytes.push(username.charCodeAt(i));
@@ -666,23 +666,23 @@
                 pwdBytes.push(password.charCodeAt(i));
             }
             
-            // Build packet exactly like the working hex
+            // Build packet exactly like the working hex with the extra 06 byte
             let packet = [
                 0x08, // field 8 - PacketId
                 0x01, // PacketId = 1
                 0x12, // field 18 - Data
-                0x38, // data length (56 bytes) - fixed!
+                0x38, // data length (56 bytes)
                 0x0a, // field 10 - name
-                usernameBytes.length, // username length
+                usernameBytes.length,
                 ...usernameBytes,
                 0x12, // field 18 - uid
-                uidBytes.length, // uid length (28)
+                uidBytes.length,
                 ...uidBytes,
                 0x18, // field 24 - skinId
                 0xe6, // 230
-                0x06, // extra byte from working packet
+                0x06, // extra byte from working packet!
                 0x2a, // field 42 - authenticationMethod
-                pwdBytes.length, // password length
+                pwdBytes.length,
                 ...pwdBytes,
                 0x38, // field 56
                 0x01  // value 1
@@ -697,17 +697,44 @@
                 msgBytes.push(message.charCodeAt(i));
             }
             
-            // Simple chat packet
             let packet = [
                 0x08, // field 8 - PacketId
                 0x05, // PacketId = 5 (chat)
                 0x12, // field 18 - Data
-                0x0c, // data length (12 bytes)
+                0x0c, // data length
                 0x08, // field 8 - playerId
                 0x00, // playerId = 0
                 0x12, // field 18 - message
                 msgBytes.length,
                 ...msgBytes
+            ];
+            
+            return new Uint8Array(packet);
+        }
+
+        // ==================== AFK PREVENTION PACKETS ====================
+        function createMovementPacket(direction) {
+            // Simulate a tiny movement to prevent AFK disconnect
+            // Packet ID 7 is movement command
+            let packet = [
+                0x08, // field 8 - PacketId
+                0x07, // PacketId = 7 (movement)
+                0x12, // field 18 - Data
+                0x08, // data length
+                0x08, // field 8 - command
+                0x01, // command = true (moving)
+                0x12, // field 18 - position (placeholder, just tiny movement)
+                0x06, // length
+                0x0d, // x field
+                0x00, // 0 (no movement)
+                0x00,
+                0x00,
+                0x00,
+                0x15, // z field
+                0x00,
+                0x00,
+                0x00,
+                0x00
             ];
             
             return new Uint8Array(packet);
@@ -733,6 +760,8 @@
         let logEntries = [];
         let packetCount = 0;
         let authenticated = false;
+        let afkInterval = null;
+        let afkEnabled = true;
 
         // ==================== LOGGING SYSTEM ====================
         function addLog(message, type = 'info') {
@@ -838,7 +867,6 @@
         }
 
         function generateUID() {
-            // Working packet UID is 28 bytes
             const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let result = '';
             for (let i = 0; i < 28; i++) {
@@ -866,7 +894,6 @@
                 
                 addLog(`[AUTH] Packet size: ${packet.length} bytes`, 'info');
                 
-                // Log full hex
                 const hexFull = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
                 addLog(`[AUTH] Packet hex: ${hexFull}`, 'info');
                 
@@ -888,16 +915,62 @@
             
             try {
                 const packet = createChatPacket('/team spectator');
-                addLog(`[SPECTATOR] Packet size: ${packet.length} bytes`, 'info');
                 ws.send(packet);
                 
                 addLog('[SPECTATOR] Command sent successfully', 'success');
                 document.getElementById('spectatorStatus').innerHTML = '✅ SPECTATOR MODE';
                 
+                // Start AFK prevention after becoming spectator
+                startAFKPrevention();
+                
             } catch (e) {
                 addLog(`[ERROR] Failed to send spectator command: ${e.message}`, 'error');
                 document.getElementById('spectatorStatus').innerHTML = '❌ FAILED';
             }
+        }
+
+        // ==================== AFK PREVENTION ====================
+        function startAFKPrevention() {
+            if (!afkEnabled) return;
+            
+            if (afkInterval) clearInterval(afkInterval);
+            
+            addLog('[AFK] Starting AFK prevention (movement every 20 seconds)', 'info');
+            
+            afkInterval = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    // Send a tiny movement packet to prevent disconnect
+                    const packet = createMovementPacket('none');
+                    ws.send(packet);
+                    addLog('[AFK] Sent keep-alive movement', 'info');
+                } else {
+                    stopAFKPrevention();
+                }
+            }, 20000); // Every 20 seconds
+        }
+
+        function stopAFKPrevention() {
+            if (afkInterval) {
+                clearInterval(afkInterval);
+                afkInterval = null;
+                addLog('[AFK] AFK prevention stopped', 'warning');
+            }
+        }
+
+        function toggleAFKPrevention() {
+            afkEnabled = !afkEnabled;
+            const btn = document.getElementById('afkToggle');
+            if (btn) {
+                btn.innerHTML = afkEnabled ? '⏱️ AFK: ON' : '⏱️ AFK: OFF';
+            }
+            
+            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN) {
+                startAFKPrevention();
+            } else {
+                stopAFKPrevention();
+            }
+            
+            addLog(`[AFK] AFK prevention ${afkEnabled ? 'enabled' : 'disabled'}`, 'info');
         }
 
         // ==================== CONNECTION MANAGEMENT ====================
@@ -922,6 +995,8 @@
                 ws.close();
                 ws = null;
             }
+            
+            stopAFKPrevention();
             
             players.clear();
             entities.clear();
@@ -963,26 +1038,27 @@
                     const data = new Uint8Array(event.data);
                     packetCount++;
                     
-                    addLog(`[DEBUG] Packet ${packetCount}: type=${data[1]}, length=${data.length}`, 'info');
-                    
-                    // Log first few bytes
-                    const hexPreview = Array.from(data.slice(0, Math.min(20, data.length))).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                    addLog(`[DEBUG] Packet data: ${hexPreview}...`, 'info');
-                    
                     // If we receive packet type 2 (game state), we're authenticated!
                     if (data[1] === 2 && !authenticated) {
                         authenticated = true;
                         addLog('[AUTH] ✅ Authentication successful!', 'success');
                         
-                        // Now send spectator command if auto-spectator is enabled
+                        // Now send spectator command
                         if (document.getElementById('autoSpectator').checked) {
                             setTimeout(sendSpectatorCommand, 1000);
                         }
+                    }
+                    
+                    // Try to parse player data for detection
+                    if (data[1] === 2 || data[1] === 8) {
+                        // Parse player positions here for detection
+                        // This would be expanded with the BR decoder
                     }
                 };
                 
                 ws.onclose = (event) => {
                     clearTimeout(connectionTimeout);
+                    stopAFKPrevention();
                     
                     let reason = 'Unknown';
                     if (event.code === 1000) reason = 'Normal closure';
@@ -990,7 +1066,7 @@
                     else if (event.code === 1002) reason = 'Protocol error';
                     else if (event.code === 1003) reason = 'Unsupported data';
                     else if (event.code === 1005) reason = 'No status received';
-                    else if (event.code === 1006) reason = 'Abnormal closure - Wrong password?';
+                    else if (event.code === 1006) reason = 'Abnormal closure';
                     
                     addLog(`[CONNECTION] Disconnected - ${reason}`, 'warning');
                     showStatus('DISCONNECTED', 'status-error');
@@ -1002,6 +1078,7 @@
                 
                 ws.onerror = () => {
                     clearTimeout(connectionTimeout);
+                    stopAFKPrevention();
                     addLog('[ERROR] Connection failed', 'error');
                     showStatus('CONNECTION FAILED', 'status-error');
                 };
@@ -1017,6 +1094,7 @@
                 addLog('[CONNECTION] Manual disconnect', 'warning');
                 ws.close();
                 ws = null;
+                stopAFKPrevention();
             }
         }
 
@@ -1028,11 +1106,9 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Draw field
             ctx.fillStyle = '#0a0a0f';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Center line
             ctx.strokeStyle = '#e94560';
             ctx.lineWidth = 2;
             ctx.setLineDash([10, 10]);
@@ -1041,14 +1117,12 @@
             ctx.lineTo(canvas.width/2, canvas.height);
             ctx.stroke();
             
-            // Center circle
             ctx.setLineDash([]);
             ctx.beginPath();
             ctx.arc(canvas.width/2, canvas.height/2, 80, 0, Math.PI * 2);
             ctx.strokeStyle = '#e94560';
             ctx.stroke();
             
-            // Goals
             ctx.fillStyle = '#e94560';
             ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
             ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
@@ -1181,13 +1255,15 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v9.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v10.0 initialized', 'success');
             addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
+            addLog('[SYSTEM] AFK Prevention active (movement every 20s)', 'info');
         });
 
         window.addEventListener('beforeunload', () => {
             if (ws) ws.close();
+            stopAFKPrevention();
         });
     </script>
 </body>
