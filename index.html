@@ -243,18 +243,19 @@
             background: #000000;
             padding: 15px;
             border-radius: 5px;
-            height: 200px;
+            height: 300px;
             overflow-y: auto;
             color: #4ade80;
-            font-size: 13px;
-            line-height: 1.6;
+            font-size: 12px;
+            line-height: 1.4;
             border: 1px solid #2d3748;
         }
         
         .log-entry {
-            margin: 3px 0;
+            margin: 2px 0;
             border-bottom: 1px solid #1a1a2e;
-            padding-bottom: 3px;
+            padding-bottom: 2px;
+            font-family: 'Courier New', monospace;
         }
         
         .log-time {
@@ -266,6 +267,8 @@
         .log-warning { color: #fbbf24; }
         .log-error { color: #ef4444; }
         .log-success { color: #4ade80; font-weight: bold; }
+        .log-movement { color: #3b82f6; }
+        .log-player { color: #a855f7; }
         
         .game-view {
             background: #1a1a2e;
@@ -477,8 +480,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v13.0</h1>
-        <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Working Spectator • AFK Prevention</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v15.0</h1>
+        <div class="subtitle">Professional Grade • Full Packet Parsing • Player Movement Logging • Auto-Backboost Detection</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -492,11 +495,12 @@
                     <input type="checkbox" id="autoSpectator" checked>
                     <span class="toggle-slider"></span>
                 </label>
-                <span style="color: #4ade80;" id="spectatorStatus">Ready</span>
+                <span style="color: #4ade80;" id="spectatorStatus">Waiting for game state...</span>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button onclick="manualSpectator()" id="manualSpectator" class="secondary">📤 GO SPECTATOR</button>
+                <button onclick="manualSpectator()" id="manualSpectator" class="secondary">👁️ GO SPECTATOR</button>
                 <button onclick="toggleAFKPrevention()" id="afkToggle" class="secondary">⏱️ AFK: ON</button>
+                <button onclick="toggleMovementLogging()" id="logToggle" class="secondary">📝 LOG: ON</button>
             </div>
         </div>
         
@@ -555,7 +559,7 @@
         <!-- Live Packet Log -->
         <div class="log-panel">
             <div class="log-header">
-                <span>📋 LIVE PACKET LOG</span>
+                <span>📋 PLAYER MOVEMENT LOG</span>
                 <span id="logCount" style="color: #4ade80;">0 entries</span>
             </div>
             <div class="log-content" id="logContent">
@@ -613,13 +617,27 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v13.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
-            Manual Spectator Button • Auto-Spectator Toggle • AFK Prevention • Password: rodshot
+            TOURNAMENT ANTI-CHEAT SYSTEM v15.0 • FULL PACKET PARSING • PLAYER MOVEMENT LOGGING • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            Logs all player positions, boosts, and movements • AFK Prevention • Password: rodshot
         </div>
     </div>
 
     <script>
-        // ==================== VARINT FUNCTIONS (from Tampermonkey) ====================
+        // ==================== VARINT FUNCTIONS ====================
+        const r7bit = arr => {
+            let r = 0, e = 0;
+            for (; 35 != e;) {
+                let f = arr[e / 7];
+                if (r |= (127 & f) << e, 0 == (128 & f)) return [r, e / 7 + 1];
+                e += 7;
+            }
+        };
+
+        const int7 = (arr, start) => {
+            let [value, bytes] = r7bit(arr.slice(start));
+            return [value, start + bytes];
+        };
+
         const w7bit = num => {
             let r = [];
             while (num >= 128) {
@@ -628,6 +646,11 @@
             }
             r.push(num % 256);
             return r;
+        };
+
+        const parseFloat32 = (arr, start) => {
+            let value = new Float32Array(new Uint8Array(arr.slice(start, start + 4)).buffer)[0];
+            return [value, start + 4];
         };
 
         // ==================== TOURNAMENT SERVERS CONFIGURATION ====================
@@ -660,6 +683,185 @@
             }
         };
 
+        // ==================== PACKET PARSING ====================
+        class PacketParser {
+            static parsePlayerUpdate(data, start) {
+                try {
+                    let pos = start;
+                    if (data[pos] !== 0x0a) return null;
+                    pos++;
+                    
+                    let [playerDataLen, newPos] = int7(data, pos);
+                    pos = newPos;
+                    
+                    let player = {
+                        id: null,
+                        constId: null,
+                        name: null,
+                        team: null,
+                        x: null,
+                        z: null,
+                        rotation: null,
+                        goals: 0,
+                        assists: 0,
+                        bot: false
+                    };
+                    
+                    // Parse player fields
+                    while (pos < start + playerDataLen) {
+                        let field = data[pos];
+                        pos++;
+                        
+                        switch(field) {
+                            case 0x08: // player id
+                                [player.id, pos] = int7(data, pos);
+                                break;
+                            case 0x12: // name
+                                let [nameLen, namePos] = int7(data, pos);
+                                pos = namePos;
+                                player.name = new TextDecoder().decode(new Uint8Array(data.slice(pos, pos + nameLen)));
+                                pos += nameLen;
+                                break;
+                            case 0x1a: // position data
+                                let [posLen, posStart] = int7(data, pos);
+                                pos = posStart;
+                                let endPos = pos + posLen;
+                                
+                                while (pos < endPos) {
+                                    let subField = data[pos];
+                                    pos++;
+                                    if (subField === 0x0d) { // x coordinate
+                                        [player.x, pos] = parseFloat32(data, pos);
+                                    } else if (subField === 0x15) { // z coordinate
+                                        [player.z, pos] = parseFloat32(data, pos);
+                                    } else {
+                                        // Skip unknown field
+                                        let [skipLen, skipPos] = int7(data, pos);
+                                        pos = skipPos + skipLen;
+                                    }
+                                }
+                                break;
+                            case 0x28: // team
+                                [player.team, pos] = int7(data, pos);
+                                break;
+                            case 0x30: // goals
+                                [player.goals, pos] = int7(data, pos);
+                                break;
+                            case 0x38: // assists
+                                [player.assists, pos] = int7(data, pos);
+                                break;
+                            case 0x40: // bot
+                                [player.bot, pos] = int7(data, pos);
+                                player.bot = player.bot === 1;
+                                break;
+                            case 0x48: // const id
+                                [player.constId, pos] = int7(data, pos);
+                                break;
+                            default:
+                                // Skip unknown field
+                                let [skipLen, skipPos] = int7(data, pos);
+                                pos = skipPos + skipLen;
+                                break;
+                        }
+                    }
+                    
+                    return player;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            static parseMovement(data, start) {
+                try {
+                    let pos = start;
+                    if (data[pos] !== 0x0a) return null;
+                    pos++;
+                    
+                    let [moveLen, newPos] = int7(data, pos);
+                    pos = newPos;
+                    
+                    let movement = {
+                        playerId: null,
+                        command: null,
+                        x: null,
+                        z: null
+                    };
+                    
+                    while (pos < start + moveLen) {
+                        let field = data[pos];
+                        pos++;
+                        
+                        switch(field) {
+                            case 0x08: // command
+                                [movement.command, pos] = int7(data, pos);
+                                break;
+                            case 0x12: // position
+                                let [posLen, posStart] = int7(data, pos);
+                                pos = posStart;
+                                let endPos = pos + posLen;
+                                
+                                while (pos < endPos) {
+                                    let subField = data[pos];
+                                    pos++;
+                                    if (subField === 0x0d) { // x
+                                        [movement.x, pos] = parseFloat32(data, pos);
+                                    } else if (subField === 0x15) { // z
+                                        [movement.z, pos] = parseFloat32(data, pos);
+                                    } else {
+                                        let [skipLen, skipPos] = int7(data, pos);
+                                        pos = skipPos + skipLen;
+                                    }
+                                }
+                                break;
+                            case 0x18: // player id
+                                [movement.playerId, pos] = int7(data, pos);
+                                break;
+                            default:
+                                let [skipLen, skipPos] = int7(data, pos);
+                                pos = skipPos + skipLen;
+                                break;
+                        }
+                    }
+                    
+                    return movement;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            static parseGameState(data) {
+                try {
+                    let pos = 2; // Skip packet header
+                    let players = [];
+                    
+                    while (pos < data.length) {
+                        let field = data[pos];
+                        pos++;
+                        
+                        if (field === 0x0a) { // Player update
+                            let player = this.parsePlayerUpdate(data, pos - 1);
+                            if (player) players.push(player);
+                            
+                            // Skip to next field
+                            let [len, newPos] = int7(data, pos);
+                            pos = newPos + len;
+                        } else if (field === 0x12) { // Game state data
+                            let [stateLen, statePos] = int7(data, pos);
+                            pos = statePos + stateLen;
+                        } else {
+                            // Skip unknown field
+                            let [len, newPos] = int7(data, pos);
+                            pos = newPos + len;
+                        }
+                    }
+                    
+                    return players;
+                } catch (e) {
+                    return [];
+                }
+            }
+        }
+
         // ==================== EXACT AUTH PACKET ====================
         function createAuthPacket(username, uid, password) {
             let usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
@@ -678,9 +880,7 @@
 
         // ==================== SPECTATOR COMMAND ====================
         function createSpectatorPacket() {
-            // EXACT packet the game sends when you type "/team spectator" and press Enter
             let msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
-            
             return new Uint8Array([
                 0x08, 0x05, 0x12, 0x0c,
                 0x08, 0x00,
@@ -688,53 +888,18 @@
             ]);
         }
 
-        // ==================== AFK PACKET (with dynamic player ID) ====================
+        // ==================== AFK PACKET ====================
         function createAFKPacket(playerId) {
-            // Base packet from Tampermonkey
             let basePacket = [0x08, 0x07, 0x12, 0x0a, 0x18, 0x05, 0x13, 0x00, 0x00, 0x80, 0x3f, 0x24];
-            
-            // Add player ID with varint encoding
             let idBytes = w7bit(playerId);
-            
             return new Uint8Array([...basePacket, ...idBytes]);
-        }
-
-        // ==================== EXTRACT PLAYER ID FROM PACKET 2 ====================
-        function extractPlayerId(data) {
-            // Look for pattern: 0x18 XX (where XX is the player ID)
-            for (let i = 0; i < data.length - 3; i++) {
-                if (data[i] === 0x18) {
-                    // Found field 24 - this should be the player's constId
-                    let id = 0;
-                    let pos = i + 1;
-                    
-                    // Read varint
-                    while (pos < data.length && (data[pos] & 0x80)) {
-                        id = (id << 7) | (data[pos] & 0x7F);
-                        pos++;
-                    }
-                    if (pos < data.length) {
-                        id = (id << 7) | data[pos];
-                        return id;
-                    }
-                }
-            }
-            
-            // Alternative: look for 0x08 0x5e pattern (playerId field)
-            for (let i = 0; i < data.length - 2; i++) {
-                if (data[i] === 0x08 && data[i+1] < 0x80) {
-                    return data[i+1];
-                }
-            }
-            
-            return null;
         }
 
         // ==================== GAME STATE ====================
         let ws = null;
         let players = new Map();
+        let playerNames = new Map();
         let ball = { x: 0, z: 0 };
-        let entities = new Map();
         let gameState = {
             timeRemaining: 300,
             redScore: 0,
@@ -752,7 +917,9 @@
         let authenticated = false;
         let afkInterval = null;
         let afkEnabled = true;
+        let movementLogging = true;
         let playerId = null;
+        let lastBoostTime = new Map();
 
         // ==================== LOGGING SYSTEM ====================
         function addLog(message, type = 'info') {
@@ -763,13 +930,16 @@
             const logCount = document.getElementById('logCount');
             
             if (logContent) {
-                const logClass = type === 'error' ? 'log-error' : type === 'warning' ? 'log-warning' : type === 'success' ? 'log-success' : 'log-info';
+                const logClass = type === 'error' ? 'log-error' : 
+                                type === 'warning' ? 'log-warning' : 
+                                type === 'movement' ? 'log-movement' :
+                                type === 'player' ? 'log-player' :
+                                type === 'success' ? 'log-success' : 'log-info';
                 logContent.innerHTML += `<div class="log-entry"><span class="log-time">[${time}]</span> <span class="${logClass}">${message}</span></div>`;
                 logContent.scrollTop = logContent.scrollHeight;
             }
             
             if (logCount) logCount.innerText = `${logEntries.length} entries`;
-            console.log(`[${time}] ${message}`);
         }
 
         function clearLogs() {
@@ -777,6 +947,13 @@
             const logContent = document.getElementById('logContent');
             if (logContent) logContent.innerHTML = '<div class="log-entry"><span class="log-time">[SYSTEM]</span> <span class="log-info">Logs cleared.</span></div>';
             addLog('Logs cleared by user', 'warning');
+        }
+
+        function toggleMovementLogging() {
+            movementLogging = !movementLogging;
+            const btn = document.getElementById('logToggle');
+            if (btn) btn.innerHTML = movementLogging ? '📝 LOG: ON' : '📝 LOG: OFF';
+            addLog(`[SYSTEM] Movement logging ${movementLogging ? 'enabled' : 'disabled'}`, 'info');
         }
 
         // ==================== SERVER MANAGEMENT ====================
@@ -864,11 +1041,6 @@
                 addLog(`[AUTH] UID: ${uid}`, 'info');
                 
                 const packet = createAuthPacket(username, uid, password);
-                
-                addLog(`[AUTH] Packet size: ${packet.length} bytes`, 'info');
-                const hexFull = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                addLog(`[AUTH] Packet hex: ${hexFull}`, 'info');
-                
                 ws.send(packet);
                 
             } catch (e) {
@@ -890,15 +1062,8 @@
                 const packet = createSpectatorPacket();
                 ws.send(packet);
                 
-                addLog('[SPECTATOR] ✅ Spectator command sent - you are now in spectator mode', 'success');
+                addLog('[SPECTATOR] ✅ Spectator command sent', 'success');
                 document.getElementById('spectatorStatus').innerHTML = '✅ SPECTATOR MODE';
-                
-                // Start AFK prevention after becoming spectator
-                if (playerId) {
-                    startAFKPrevention();
-                } else {
-                    addLog('[SPECTATOR] Waiting for player ID before starting AFK...', 'info');
-                }
                 
             } catch (e) {
                 addLog(`[ERROR] Failed to send spectator command: ${e.message}`, 'error');
@@ -907,18 +1072,13 @@
         }
 
         function manualSpectator() {
-            // This just sends the spectator command - does NOT disconnect
             addLog('[MANUAL] Manual spectator command triggered', 'info');
             sendSpectatorCommand();
         }
 
         // ==================== AFK PREVENTION ====================
         function startAFKPrevention() {
-            if (!afkEnabled || !playerId) {
-                if (!playerId) addLog('[AFK] Cannot start - No player ID', 'warning');
-                return;
-            }
-            
+            if (!afkEnabled || !playerId) return;
             if (afkInterval) clearInterval(afkInterval);
             
             addLog(`[AFK] Starting AFK prevention with player ID: ${playerId}`, 'info');
@@ -927,7 +1087,6 @@
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     const packet = createAFKPacket(playerId);
                     ws.send(packet);
-                    addLog('[AFK] Sent keep-alive movement', 'info');
                 } else {
                     stopAFKPrevention();
                 }
@@ -956,6 +1115,113 @@
             addLog(`[AFK] AFK prevention ${afkEnabled ? 'enabled' : 'disabled'}`, 'info');
         }
 
+        // ==================== PLAYER TRACKING ====================
+        function updatePlayerFromPacket(playerData) {
+            if (!playerData || !playerData.id) return;
+            
+            let player = players.get(playerData.id) || {
+                id: playerData.id,
+                name: 'Unknown',
+                team: 2,
+                x: 0,
+                z: 0,
+                goals: 0,
+                assists: 0,
+                bot: false,
+                boosts: [],
+                suspicious: false
+            };
+            
+            // Update player data
+            if (playerData.name) {
+                player.name = playerData.name;
+                playerNames.set(playerData.id, playerData.name);
+            }
+            if (playerData.team !== null) player.team = playerData.team;
+            if (playerData.x !== null) player.x = playerData.x;
+            if (playerData.z !== null) player.z = playerData.z;
+            if (playerData.goals) player.goals = playerData.goals;
+            if (playerData.assists) player.assists = playerData.assists;
+            if (playerData.bot !== null) player.bot = playerData.bot;
+            
+            players.set(playerData.id, player);
+            
+            if (movementLogging && playerData.x !== null && playerData.z !== null) {
+                let teamName = player.team === 0 ? '🔴' : player.team === 1 ? '🔵' : '👁️';
+                addLog(`${teamName} ${player.name} moved to (${playerData.x.toFixed(2)}, ${playerData.z.toFixed(2)})`, 'movement');
+            }
+        }
+
+        function handleBoost(playerId) {
+            if (!playerId) return;
+            
+            const now = Date.now();
+            let player = players.get(playerId);
+            if (!player) return;
+            
+            if (!boostHistory.has(playerId)) {
+                boostHistory.set(playerId, []);
+            }
+            
+            let boosts = boostHistory.get(playerId);
+            let lastBoost = lastBoostTime.get(playerId) || 0;
+            let interval = now - lastBoost;
+            
+            boosts.push(now);
+            if (boosts.length > 20) boosts.shift();
+            
+            player.boosts = boosts;
+            lastBoostTime.set(playerId, now);
+            
+            if (movementLogging && interval > 0) {
+                addLog(`⚡ ${player.name} boosted (interval: ${interval}ms)`, 'player');
+            }
+            
+            // Check for 130ms pattern
+            if (boosts.length >= 8) {
+                let suspicious = 0;
+                for (let i = 1; i < boosts.length; i++) {
+                    let interv = boosts[i] - boosts[i-1];
+                    if (interv >= 125 && interv <= 135) suspicious++;
+                }
+                
+                let ratio = suspicious / boosts.length;
+                if (ratio > 0.6) {
+                    player.suspicious = true;
+                    detectCheater(player, boosts, ratio);
+                }
+            }
+            
+            players.set(playerId, player);
+            boostHistory.set(playerId, boosts);
+        }
+
+        function detectCheater(player, boosts, ratio) {
+            const detection = {
+                id: Date.now(),
+                timestamp: new Date().toISOString(),
+                playerId: player.id,
+                playerName: player.name,
+                team: player.team,
+                server: selectedServer?.displayName,
+                confidence: Math.min(100, ratio * 100),
+                boostCount: boosts.length,
+                matchRatio: ratio
+            };
+            
+            detections.push(detection);
+            localStorage.setItem('tournamentDetections', JSON.stringify(detections));
+            
+            updateDetectionsList();
+            addLog(`[🚨 CHEATER] ${player.name} - ${detection.confidence.toFixed(1)}% confidence (${(ratio*100).toFixed(1)}% at 130ms)`, 'error');
+            
+            if (Notification.permission === 'granted') {
+                new Notification('🚨 AUTO-BACKBOOST DETECTED!', {
+                    body: `${player.name} - ${detection.confidence.toFixed(1)}% confidence`
+                });
+            }
+        }
+
         // ==================== CONNECTION MANAGEMENT ====================
         function connectToSelected() {
             if (!selectedServer) {
@@ -982,8 +1248,9 @@
             stopAFKPrevention();
             
             players.clear();
-            entities.clear();
+            playerNames.clear();
             boostHistory.clear();
+            lastBoostTime.clear();
             packetCount = 0;
             authenticated = false;
             playerId = null;
@@ -1020,24 +1287,53 @@
                     const data = new Uint8Array(event.data);
                     packetCount++;
                     
-                    // Packet type 2 = game state (authentication successful)
-                    if (data[1] === 2 && !authenticated) {
-                        authenticated = true;
-                        
-                        // Extract player ID from packet 2
-                        const extractedId = extractPlayerId(data);
-                        if (extractedId) {
-                            playerId = extractedId;
-                            addLog(`[AUTH] ✅ Authentication successful! Player ID: ${playerId}`, 'success');
-                        } else {
-                            addLog(`[AUTH] ✅ Authentication successful! (could not extract ID)`, 'success');
+                    // Parse based on packet type
+                    if (data[1] === 2) { // Game state packet
+                        if (!authenticated) {
+                            authenticated = true;
+                            addLog('[AUTH] ✅ Authentication successful!', 'success');
+                            
+                            // Try to find our player ID
+                            for (let i = 0; i < data.length; i++) {
+                                if (data[i] === 0x48) { // constId field
+                                    let [id, pos] = int7(data, i + 1);
+                                    playerId = id;
+                                    addLog(`[AUTH] Player ID: ${playerId}`, 'success');
+                                    break;
+                                }
+                            }
+                            
+                            // Send spectator command if auto enabled
+                            if (document.getElementById('autoSpectator').checked) {
+                                setTimeout(() => {
+                                    sendSpectatorCommand();
+                                    // Start AFK after spectator command
+                                    setTimeout(() => startAFKPrevention(), 500);
+                                }, 1000);
+                            }
                         }
                         
-                        // Send spectator command if auto-spectator is enabled
-                        if (document.getElementById('autoSpectator').checked) {
-                            setTimeout(sendSpectatorCommand, 1000);
+                        // Parse all players in game state
+                        let players_data = PacketParser.parseGameState(data);
+                        players_data.forEach(p => updatePlayerFromPacket(p));
+                        
+                    } else if (data[1] === 8) { // Player spawn/update
+                        let player = PacketParser.parsePlayerUpdate(data, 2);
+                        if (player) {
+                            updatePlayerFromPacket(player);
+                            addLog(`[PLAYER] ${player.name} (Team ${player.team}) spawned`, 'player');
+                        }
+                        
+                    } else if (data[1] === 7) { // Movement packet (boost detection!)
+                        let movement = PacketParser.parseMovement(data, 2);
+                        if (movement && movement.playerId) {
+                            handleBoost(movement.playerId);
                         }
                     }
+                    
+                    // Update UI
+                    drawCanvas();
+                    updatePlayerList();
                 };
                 
                 ws.onclose = (event) => {
@@ -1110,6 +1406,29 @@
             ctx.fillStyle = '#e94560';
             ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
             ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
+            
+            // Draw players
+            players.forEach(player => {
+                if (player.x === undefined || player.z === undefined) return;
+                
+                let x = (player.x / 50) * canvas.width/2 + canvas.width/2;
+                let y = (player.z / 50) * canvas.height/2 + canvas.height/2;
+                
+                ctx.fillStyle = player.team === 0 ? '#ef4444' : player.team === 1 ? '#3b82f6' : '#a855f7';
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                if (player.suspicious) {
+                    ctx.fillStyle = '#ef4444';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillText('⚠️', x + 15, y - 15);
+                }
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '12px Arial';
+                ctx.fillText(player.name || '?', x - 20, y - 20);
+            });
         }
 
         function updatePlayerList() {
@@ -1117,22 +1436,32 @@
             const count = document.getElementById('playerCount');
             if (!list) return;
             
-            list.innerHTML = '<div style="padding: 20px; text-align: center; color: #6b7280;">Waiting for game data...</div>';
-            if (count) count.innerText = '(0)';
-        }
-
-        function updateGameTime() {
-            const mins = Math.floor(gameState.timeRemaining / 60);
-            const secs = Math.floor(gameState.timeRemaining % 60);
-            const timeEl = document.getElementById('gameTime');
-            if (timeEl) timeEl.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        function updateScores() {
-            const redEl = document.getElementById('redScore');
-            const blueEl = document.getElementById('blueScore');
-            if (redEl) redEl.innerText = gameState.redScore;
-            if (blueEl) blueEl.innerText = gameState.blueScore;
+            let html = '';
+            players.forEach(player => {
+                let teamName = player.team === 0 ? '🔴 RED' : player.team === 1 ? '🔵 BLUE' : '👁️ SPEC';
+                let boosts = boostHistory.get(player.id) || [];
+                let suspiciousRate = boosts.length > 0 ? 
+                    (boosts.filter((b, i, arr) => i > 0 && (b - arr[i-1]) >= 125 && (b - arr[i-1]) <= 135).length / boosts.length * 100).toFixed(1) : 0;
+                
+                html += `
+                    <div class="player-item ${player.suspicious ? 'suspicious' : ''}">
+                        <span>
+                            <strong>${player.name || 'Unknown'}</strong>
+                            ${player.bot ? '<span class="badge badge-clean">BOT</span>' : ''}
+                            ${player.suspicious ? '<span class="badge badge-cheater">CHEATER</span>' : ''}
+                        </span>
+                        <span>
+                            ${teamName} | 
+                            Goals: ${player.goals || 0} |
+                            Boosts: ${boosts.length} |
+                            ${suspiciousRate}% 130ms
+                        </span>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html || '<div style="padding: 20px; text-align: center;">No players yet</div>';
+            if (count) count.innerText = `(${players.size})`;
         }
 
         function updateDetectionsList() {
@@ -1141,17 +1470,12 @@
             
             list.innerHTML = detections.slice(-20).reverse().map(d => `
                 <div class="detection-card">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <strong style="color: #ef4444; font-size: 18px;">⚠️ ${d.playerName}</strong>
-                        <span style="color: #a0aec0;">${new Date(d.timestamp).toLocaleString()}</span>
+                    <div style="display: flex; justify-content: space-between;">
+                        <strong>⚠️ ${d.playerName}</strong>
+                        <span>${new Date(d.timestamp).toLocaleTimeString()}</span>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-                        <div>Server: <span style="color: #4ade80;">${d.server}</span></div>
-                        <div>Team: <span style="color: ${d.team === 0 ? '#ef4444' : d.team === 1 ? '#3b82f6' : '#a855f7'};">${d.team === 0 ? 'RED' : d.team === 1 ? 'BLUE' : 'SPEC'}</span></div>
-                        <div>Confidence: <span style="color: #fbbf24;">${d.confidence.toFixed(1)}%</span></div>
-                        <div>Boosts: <span style="color: #4ade80;">${d.boostCount}</span></div>
-                        <div style="grid-column: span 2;">Match Ratio: <span style="color: #ef4444;">${(d.matchRatio * 100).toFixed(1)}% at 130ms</span></div>
-                    </div>
+                    <div>Confidence: ${d.confidence.toFixed(1)}% (${(d.matchRatio*100).toFixed(1)}% at 130ms)</div>
+                    <div>Boosts: ${d.boostCount}</div>
                 </div>
             `).join('');
         }
@@ -1236,10 +1560,9 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v13.0 initialized', 'success');
-            addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v15.0 initialized', 'success');
+            addLog('[SYSTEM] Full packet parsing active - logging all player movements', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
-            addLog('[SYSTEM] Manual spectator button will NOT disconnect', 'info');
         });
 
         window.addEventListener('beforeunload', () => {
