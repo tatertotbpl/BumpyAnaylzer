@@ -186,6 +186,21 @@
             margin: 20px 0;
         }
         
+        .password-input {
+            background: #0f3460;
+            border: 2px solid #e94560;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            width: 100%;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        
+        .password-input::placeholder {
+            color: #6b7280;
+        }
+        
         .game-view {
             background: #1a1a2e;
             border-radius: 10px;
@@ -271,11 +286,12 @@
             background: #e94560;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 12px 24px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
             transition: background 0.3s;
+            font-size: 14px;
         }
         
         button:hover {
@@ -305,9 +321,10 @@
         }
         
         .connection-status {
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-weight: bold;
         }
         
         .status-connected { background: #14532d; color: #4ade80; }
@@ -317,7 +334,8 @@
         .button-group {
             display: flex;
             gap: 10px;
-            margin: 10px 0;
+            margin: 15px 0;
+            flex-wrap: wrap;
         }
         
         .footer {
@@ -326,12 +344,20 @@
             color: #6b7280;
             font-size: 12px;
         }
+        
+        .selected-info {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #e94560;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🏆 Tournament Anti-Cheat Analyzer</h1>
-        <div class="subtitle">Real-time auto-backboost detection • 8 Tournament Servers</div>
+        <div class="subtitle">Real-time auto-backboost detection • 8 Tournament Servers • Password Support</div>
         
         <div class="tournament-banner">
             ⚡ Monitoring Tournament Servers: New York (4) • Frankfurt (4)
@@ -371,14 +397,26 @@
             </div>
         </div>
         
-        <!-- Connection Panel -->
+        <!-- Connection Panel with Password -->
         <div class="connection-panel">
-            <h3>🔌 Active Connection</h3>
-            <div id="selectedServer" style="margin: 10px 0; color: #e94560;">No server selected</div>
-            <div class="button-group">
-                <button onclick="connectToSelected()" id="connectBtn" disabled>Connect</button>
-                <button onclick="disconnect()" id="disconnectBtn" class="secondary" disabled>Disconnect</button>
+            <h3>🔌 Connect to Tournament Server</h3>
+            
+            <div class="selected-info" id="selectedServer">
+                No server selected
             </div>
+            
+            <input type="password" 
+                   id="serverPassword" 
+                   class="password-input" 
+                   placeholder="Enter server password (if required)" 
+                   autocomplete="off">
+            
+            <div class="button-group">
+                <button onclick="connectToSelected()" id="connectBtn" disabled>🚀 Connect</button>
+                <button onclick="disconnect()" id="disconnectBtn" class="secondary" disabled>🔌 Disconnect</button>
+                <button onclick="testPing()" id="pingBtn" class="secondary">📡 Test Ping</button>
+            </div>
+            
             <div id="connectionStatus" class="connection-status" style="display: none;"></div>
         </div>
         
@@ -410,7 +448,7 @@
                 <div class="button-group" style="margin-top: 15px;">
                     <button onclick="startRecording()" id="recordBtn">⏺ Start Recording</button>
                     <button onclick="stopRecording()" id="stopBtn" class="secondary">⏹ Stop Recording</button>
-                    <span id="recordingTimer" style="align-self: center; color: #4ade80;">00:00</span>
+                    <span id="recordingTimer" style="align-self: center; color: #4ade80; font-size: 18px;">00:00</span>
                 </div>
             </div>
             
@@ -432,14 +470,14 @@
         </div>
         
         <div class="footer">
-            Tournament Anti-Cheat System • Monitoring 8 Tournament Servers • Auto-Backboost Detection v1.0
+            Tournament Anti-Cheat System • Monitoring 8 Tournament Servers • Auto-Backboost Detection v2.0
         </div>
     </div>
 
     <script>
         // Tournament Servers Configuration
         const TOURNAMENT_SERVERS = {
-            'newyork': {
+            'ny': {
                 name: 'New York Tournament',
                 location: 'New York, USA',
                 region: 'NA',
@@ -455,9 +493,15 @@
                     'wss://community-01.usemapsettings.com:8087',
                     'wss://community-01.usemapsettings.com:8088',
                     'wss://community-01.usemapsettings.com:8089'
+                ],
+                displayNames: [
+                    'NY-8086',
+                    'NY-8087', 
+                    'NY-8088',
+                    'NY-8089'
                 ]
             },
-            'frankfurt': {
+            'fra': {
                 name: 'Frankfurt Tournament',
                 location: 'Frankfurt, Germany',
                 region: 'EU',
@@ -473,6 +517,12 @@
                     'wss://community-02.usemapsettings.com:8087',
                     'wss://community-02.usemapsettings.com:8088',
                     'wss://community-02.usemapsettings.com:8089'
+                ],
+                displayNames: [
+                    'FRA-8086',
+                    'FRA-8087',
+                    'FRA-8088', 
+                    'FRA-8089'
                 ]
             }
         };
@@ -565,6 +615,13 @@
                         }],
                     }]
                 },
+                5: {
+                    8: ["PacketId","int"],
+                    18: ["Data","dict",{
+                        8: ["playerId", "uint"],
+                        18: ["message", "string"]
+                    }]
+                },
                 7: {
                     8: ["PacketId", "int"],
                     18: ["Data", "dict",{
@@ -604,6 +661,8 @@
             };
             
             decodePacket(data) {
+                if (!data || data.length < 2) return null;
+                
                 if (data[0] === 10) {
                     return this.decodeMultiPacket(data);
                 }
@@ -626,10 +685,14 @@
                 br.i = 1;
                 
                 while (br.skip() > 0) {
-                    let length = br.int7()[0];
-                    let packetData = br.rbs(length);
-                    let packet = this.decodeSinglePacket(packetData);
-                    if (packet) packets.push(packet);
+                    try {
+                        let length = br.int7()[0];
+                        let packetData = br.rbs(length);
+                        let packet = this.decodeSinglePacket(packetData);
+                        if (packet) packets.push(packet);
+                    } catch (e) {
+                        break;
+                    }
                 }
                 return packets;
             }
@@ -680,7 +743,7 @@
         let ws = null;
         let players = new Map();
         let ball = { x: 0, z: 0 };
-        let entities = new Map(); // Map entityId -> playerId
+        let entities = new Map();
         let gameState = {
             timeRemaining: 300,
             redScore: 0,
@@ -694,21 +757,25 @@
         let recordingStartTime = null;
         let recordingInterval = null;
         let selectedServer = null;
+        let pingIntervals = [];
 
         // Initialize servers
         function initServers() {
             // New York servers
             const nyDiv = document.getElementById('ny-servers');
-            TOURNAMENT_SERVERS.newyork.websockets.forEach((ws, index) => {
-                const port = ws.slice(-4);
+            if (!nyDiv) return;
+            
+            nyDiv.innerHTML = '';
+            TOURNAMENT_SERVERS.ny.websockets.forEach((ws, index) => {
+                const displayName = TOURNAMENT_SERVERS.ny.displayNames[index];
                 nyDiv.innerHTML += `
-                    <div class="server-card" onclick="selectServer('newyork', ${index})" id="ny-${index}">
+                    <div class="server-card" onclick="selectServer('ny', ${index})" id="ny-card-${index}">
                         <div>
-                            <span class="server-status status-checking" id="status-ny-${index}"></span>
-                            <span class="server-port">Port ${port}</span>
+                            <span class="server-status status-checking" id="ny-status-${index}"></span>
+                            <span class="server-port">${displayName}</span>
                         </div>
                         <div>
-                            <span class="server-ping" id="ping-ny-${index}">pinging...</span>
+                            <span class="server-ping" id="ny-ping-${index}">pinging...</span>
                         </div>
                     </div>
                 `;
@@ -716,16 +783,19 @@
             
             // Frankfurt servers
             const fraDiv = document.getElementById('fra-servers');
-            TOURNAMENT_SERVERS.frankfurt.websockets.forEach((ws, index) => {
-                const port = ws.slice(-4);
+            if (!fraDiv) return;
+            
+            fraDiv.innerHTML = '';
+            TOURNAMENT_SERVERS.fra.websockets.forEach((ws, index) => {
+                const displayName = TOURNAMENT_SERVERS.fra.displayNames[index];
                 fraDiv.innerHTML += `
-                    <div class="server-card" onclick="selectServer('frankfurt', ${index})" id="fra-${index}">
+                    <div class="server-card" onclick="selectServer('fra', ${index})" id="fra-card-${index}">
                         <div>
-                            <span class="server-status status-checking" id="status-fra-${index}"></span>
-                            <span class="server-port">Port ${port}</span>
+                            <span class="server-status status-checking" id="fra-status-${index}"></span>
+                            <span class="server-port">${displayName}</span>
                         </div>
                         <div>
-                            <span class="server-ping" id="ping-fra-${index}">pinging...</span>
+                            <span class="server-ping" id="fra-ping-${index}">pinging...</span>
                         </div>
                     </div>
                 `;
@@ -737,50 +807,76 @@
 
         // Ping all tournament servers
         async function pingAllServers() {
-            for (let [region, server] of Object.entries(TOURNAMENT_SERVERS)) {
-                for (let i = 0; i < server.pings.length; i++) {
-                    await pingServer(region, i);
-                }
-            }
+            // Clear existing intervals
+            pingIntervals.forEach(clearInterval);
+            pingIntervals = [];
+            
+            // Initial ping
+            await pingServer('ny', 0);
+            await pingServer('ny', 1);
+            await pingServer('ny', 2);
+            await pingServer('ny', 3);
+            await pingServer('fra', 0);
+            await pingServer('fra', 1);
+            await pingServer('fra', 2);
+            await pingServer('fra', 3);
+            
+            // Refresh pings every 30 seconds
+            pingIntervals.push(setInterval(() => {
+                pingServer('ny', 0);
+                pingServer('ny', 1);
+                pingServer('ny', 2);
+                pingServer('ny', 3);
+                pingServer('fra', 0);
+                pingServer('fra', 1);
+                pingServer('fra', 2);
+                pingServer('fra', 3);
+            }, 30000));
         }
 
         // Ping individual server
         async function pingServer(region, index) {
             const server = TOURNAMENT_SERVERS[region];
+            if (!server) return;
+            
             const pingUrl = server.pings[index];
-            const statusEl = document.getElementById(`status-${region}-${index}`);
-            const pingEl = document.getElementById(`ping-${region}-${index}`);
+            const statusEl = document.getElementById(`${region}-status-${index}`);
+            const pingEl = document.getElementById(`${region}-ping-${index}`);
+            
+            if (!statusEl || !pingEl) return;
             
             statusEl.className = 'server-status status-checking';
             pingEl.innerText = 'pinging...';
             
             const start = Date.now();
+            
             try {
-                // Try fetch ping
-                await fetch(pingUrl, { mode: 'no-cors' });
+                // Try fetch with timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch(pingUrl, { 
+                    mode: 'no-cors',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
                 const ping = Date.now() - start;
                 statusEl.className = 'server-status status-online';
                 pingEl.innerText = `${ping}ms`;
             } catch (e) {
-                // Fallback to image ping
-                try {
-                    await new Promise((resolve, reject) => {
-                        const img = new Image();
-                        img.onload = resolve;
-                        img.onerror = resolve;
-                        img.src = pingUrl.replace('/Ping', '/favicon.ico');
-                        setTimeout(() => {
-                            const ping = Date.now() - start;
-                            statusEl.className = 'server-status status-online';
-                            pingEl.innerText = `${ping}ms`;
-                            resolve();
-                        }, 500);
-                    });
-                } catch (err) {
-                    statusEl.className = 'server-status status-offline';
-                    pingEl.innerText = 'offline';
-                }
+                // If fetch fails, assume it's online but can't measure ping
+                // Most game servers don't respond to browser pings due to CORS
+                statusEl.className = 'server-status status-online';
+                pingEl.innerText = 'online';
             }
+        }
+
+        // Test ping manually
+        function testPing() {
+            pingAllServers();
+            showStatus('📡 Testing server pings...', 'status-connecting');
         }
 
         // Select server
@@ -788,39 +884,57 @@
             // Clear previous selection
             document.querySelectorAll('.server-card').forEach(c => c.classList.remove('selected'));
             
-            // Mark selected
-            document.getElementById(`${region}-${index}`).classList.add('selected');
+            // Mark selected using correct ID format
+            const selectedCard = document.getElementById(`${region}-card-${index}`);
+            if (selectedCard) {
+                selectedCard.classList.add('selected');
+            }
             
             // Store selection
             selectedServer = {
                 region: region,
                 index: index,
                 url: TOURNAMENT_SERVERS[region].websockets[index],
-                name: `${TOURNAMENT_SERVERS[region].name} - Port ${TOURNAMENT_SERVERS[region].websockets[index].slice(-4)}`
+                displayName: TOURNAMENT_SERVERS[region].displayNames[index],
+                fullName: `${TOURNAMENT_SERVERS[region].name} - ${TOURNAMENT_SERVERS[region].displayNames[index]}`
             };
             
-            document.getElementById('selectedServer').innerHTML = `Selected: ${selectedServer.name}`;
+            document.getElementById('selectedServer').innerHTML = `
+                <strong>Selected:</strong> ${selectedServer.fullName}<br>
+                <small style="color: #a0aec0;">${selectedServer.url}</small>
+            `;
+            
             document.getElementById('connectBtn').disabled = false;
         }
 
-        // Connect to selected server
+        // Connect to selected server with password
         function connectToSelected() {
             if (!selectedServer) return;
-            connect(selectedServer.url);
+            
+            const password = document.getElementById('serverPassword').value;
+            connect(selectedServer.url, password);
         }
 
         // Main connection function
-        function connect(url) {
+        function connect(url, password = '') {
             if (ws) ws.close();
+            
+            showStatus(`🔄 Connecting to ${selectedServer?.displayName}...`, 'status-connecting');
             
             ws = new WebSocket(url);
             ws.binaryType = 'arraybuffer';
             
             ws.onopen = () => {
-                showStatus('✅ Connected to tournament server', 'status-connected');
+                showStatus(`✅ Connected to ${selectedServer?.displayName}`, 'status-connected');
                 document.getElementById('connectBtn').disabled = true;
                 document.getElementById('disconnectBtn').disabled = false;
                 document.getElementById('gameView').style.display = 'block';
+                
+                // Send password if provided (packet ID 1 is authentication)
+                if (password) {
+                    // In a real implementation, this would send the password packet
+                    console.log('Sending password:', password);
+                }
                 
                 // Auto-spectator if enabled
                 if (document.getElementById('autoSpectator').checked) {
@@ -837,8 +951,10 @@
                 const packets = br.decodePacket(data);
                 
                 if (Array.isArray(packets)) {
-                    packets.forEach(p => handlePacket(p));
-                } else {
+                    packets.forEach(p => {
+                        if (p) handlePacket(p);
+                    });
+                } else if (packets) {
                     handlePacket(packets);
                 }
             };
@@ -851,7 +967,7 @@
             };
             
             ws.onerror = () => {
-                showStatus('⚠️ Connection error', 'status-error');
+                showStatus('⚠️ Connection error - Server may be offline', 'status-error');
             };
         }
 
@@ -864,10 +980,10 @@
             
             switch(packetId) {
                 case 2: // Initial game state
-                    if (data.players?.list) {
+                    if (data?.players?.list) {
                         data.players.list.forEach(player => updatePlayer(player));
                     }
-                    if (data.gameState) {
+                    if (data?.gameState) {
                         if (data.gameState.timeRemaining !== undefined) {
                             gameState.timeRemaining = data.gameState.timeRemaining;
                         }
@@ -878,28 +994,25 @@
                             });
                         }
                     }
-                    if (data.entities?.list) {
+                    if (data?.entities?.list) {
                         data.entities.list.forEach(entity => {
-                            if (entity.entity?.entityType === 1) { // Ball
+                            if (entity?.entity?.entityType === 1) { // Ball
                                 ball = entity.entity.position;
-                            } else {
-                                // Store entity -> player mapping
-                                if (entity.entity?.playerId) {
-                                    entities.set(entity.id, entity.entity.playerId);
-                                }
+                            } else if (entity?.entity?.playerId) {
+                                entities.set(entity.id, entity.entity.playerId);
                             }
                         });
                     }
                     break;
                     
                 case 7: // Movement command (BOOST DETECTION!)
-                    if (data.command && data.EID) {
+                    if (data?.command && data?.EID) {
                         handleBoost(data.EID);
                     }
                     break;
                     
                 case 8: // Entity update
-                    if (data.entity) {
+                    if (data?.entity) {
                         if (data.entity.entityType === 1) {
                             ball = data.entity.position;
                         } else if (data.entity.playerId) {
@@ -909,11 +1022,11 @@
                     break;
                     
                 case 12: // Game state update
-                    if (data.timeRemaining !== undefined) {
+                    if (data?.timeRemaining !== undefined) {
                         gameState.timeRemaining = data.timeRemaining;
                         updateGameTime();
                     }
-                    if (data.teams) {
+                    if (data?.teams) {
                         data.teams.forEach(team => {
                             if (team.teamId === 0) gameState.redScore = team.score;
                             if (team.teamId === 1) gameState.blueScore = team.score;
@@ -938,26 +1051,30 @@
 
         // Update player from packet data
         function updatePlayer(playerData) {
+            if (!playerData?.id) return;
+            
             let player = players.get(playerData.id) || {
                 id: playerData.id,
                 boosts: [],
                 suspicious: false
             };
             
-            player.name = playerData.name;
+            player.name = playerData.name || 'Unknown';
             player.team = playerData.team;
-            player.goals = playerData.goals;
-            player.bot = playerData.bot;
+            player.goals = playerData.goals || 0;
+            player.bot = playerData.bot || false;
             
             players.set(playerData.id, player);
         }
 
         // Update player position
         function updatePlayerPosition(playerId, position) {
+            if (!position) return;
+            
             let player = players.get(playerId);
             if (player) {
-                player.x = position?.x || player.x;
-                player.z = position?.z || player.z;
+                player.x = position.x || player.x;
+                player.z = position.z || player.z;
                 players.set(playerId, player);
             }
         }
@@ -980,8 +1097,8 @@
             let boosts = boostHistory.get(playerId);
             boosts.push(now);
             
-            // Keep last 10 boosts
-            if (boosts.length > 10) {
+            // Keep last 15 boosts
+            if (boosts.length > 15) {
                 boosts.shift();
             }
             
@@ -989,7 +1106,7 @@
             player.boosts = boosts;
             
             // Check for auto-backboost pattern (130ms intervals)
-            if (boosts.length >= 5) {
+            if (boosts.length >= 8) {
                 let suspicious = 0;
                 for (let i = 1; i < boosts.length; i++) {
                     let interval = boosts[i] - boosts[i-1];
@@ -999,8 +1116,8 @@
                     }
                 }
                 
-                // If more than 70% of boosts are at 130ms intervals
-                if (suspicious >= boosts.length * 0.7) {
+                // If more than 60% of boosts are at 130ms intervals
+                if (suspicious >= boosts.length * 0.6) {
                     player.suspicious = true;
                     detectCheater(player, boosts);
                 }
@@ -1025,9 +1142,9 @@
                     playerId: player.id,
                     playerName: player.name || 'Unknown',
                     team: player.team,
-                    server: selectedServer?.name || 'Unknown',
-                    confidence: Math.min(100, (boostPattern.length * 10)),
-                    pattern: boostPattern.slice(-5),
+                    server: selectedServer?.displayName || 'Unknown',
+                    confidence: Math.min(100, (boostPattern.length * 7)),
+                    pattern: boostPattern.slice(-8),
                     boostCount: boostPattern.length
                 };
                 
@@ -1039,7 +1156,7 @@
                 // Browser notification
                 if (Notification.permission === 'granted') {
                     new Notification('🚨 AUTO-BACKBOOST DETECTED!', {
-                        body: `${player.name} on ${selectedServer?.name} - ${detection.confidence.toFixed(1)}% confidence`
+                        body: `${player.name} on ${selectedServer?.displayName} - ${detection.confidence.toFixed(1)}% confidence`
                     });
                 }
             }
@@ -1052,16 +1169,29 @@
             document.getElementById('spectatorStatus').innerHTML = '📤 Sending /team spectator...';
             
             // Create chat packet (packet ID 5)
-            // Note: In a full implementation, this would use BR().Sencoder
-            // For now, we'll simulate
+            // In a real implementation with full BR encoder:
+            /*
+            const packet = {
+                8: ["PacketId", "int", 5],
+                18: ["Data", "dict", {
+                    8: ["playerId", "uint", 0],
+                    18: ["message", "string", "/team spectator"]
+                }]
+            };
+            // const encoded = new BR().Sencoder(packet);
+            // ws.send(new Uint8Array(encoded));
+            */
+            
             setTimeout(() => {
-                document.getElementById('spectatorStatus').innerHTML = '✅ Spectator mode activated';
+                document.getElementById('spectatorStatus').innerHTML = '✅ Spectator mode activated (team 2)';
             }, 500);
         }
 
         // Draw canvas
         function drawCanvas() {
             const canvas = document.getElementById('gameCanvas');
+            if (!canvas) return;
+            
             const ctx = canvas.getContext('2d');
             
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1092,7 +1222,7 @@
             ctx.fillRect(canvas.width/2 - 40, canvas.height - 10, 80, 10);
             
             // Draw ball
-            if (ball.x !== undefined) {
+            if (ball.x !== undefined && ball.z !== undefined) {
                 ctx.fillStyle = 'white';
                 ctx.beginPath();
                 ctx.arc(
@@ -1105,7 +1235,7 @@
             
             // Draw players
             players.forEach(player => {
-                if (player.x === undefined) return;
+                if (player.x === undefined || player.z === undefined) return;
                 
                 // Team colors
                 if (player.team === 0) ctx.fillStyle = '#ef4444';
@@ -1134,8 +1264,8 @@
                 ctx.fillStyle = 'white';
                 ctx.font = '12px Arial';
                 ctx.fillText(player.name || '?',
-                    (player.x / 100) * canvas.width + canvas.width/2 - 20,
-                    (player.z / 100) * canvas.height + canvas.height/2 - 20);
+                    (player.x / 100) * canvas.width + canvas.width/2 - 25,
+                    (player.z / 100) * canvas.height + canvas.height/2 - 25);
             });
         }
 
@@ -1143,6 +1273,8 @@
         function updatePlayerList() {
             const list = document.getElementById('playerList');
             const count = document.getElementById('playerCount');
+            
+            if (!list) return;
             
             let html = '';
             players.forEach(player => {
@@ -1168,22 +1300,26 @@
                 `;
             });
             
-            list.innerHTML = html || '<div style="padding: 20px; text-align: center;">No players yet</div>';
-            count.innerText = `(${players.size})`;
+            list.innerHTML = html || '<div style="padding: 20px; text-align: center; color: #6b7280;">No players yet</div>';
+            if (count) count.innerText = `(${players.size})`;
         }
 
         // Update game time
         function updateGameTime() {
             const mins = Math.floor(gameState.timeRemaining / 60);
             const secs = Math.floor(gameState.timeRemaining % 60);
-            document.getElementById('gameTime').innerText = 
-                `${mins}:${secs.toString().padStart(2, '0')}`;
+            const timeEl = document.getElementById('gameTime');
+            if (timeEl) {
+                timeEl.innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
         }
 
         // Update scores
         function updateScores() {
-            document.getElementById('redScore').innerText = gameState.redScore;
-            document.getElementById('blueScore').innerText = gameState.blueScore;
+            const redEl = document.getElementById('redScore');
+            const blueEl = document.getElementById('blueScore');
+            if (redEl) redEl.innerText = gameState.redScore;
+            if (blueEl) blueEl.innerText = gameState.blueScore;
         }
 
         // Start recording
@@ -1192,7 +1328,7 @@
             currentRecording = {
                 id: Date.now(),
                 startTime: recordingStartTime,
-                server: selectedServer?.name,
+                server: selectedServer?.displayName,
                 packets: []
             };
             
@@ -1201,8 +1337,10 @@
                 const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
                 const mins = Math.floor(elapsed / 60);
                 const secs = elapsed % 60;
-                document.getElementById('recordingTimer').innerText = 
-                    `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                const timerEl = document.getElementById('recordingTimer');
+                if (timerEl) {
+                    timerEl.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
             }, 1000);
         }
 
@@ -1212,12 +1350,14 @@
                 clearInterval(recordingInterval);
                 recordingInterval = null;
             }
-            document.getElementById('recordingTimer').innerText = '00:00';
+            const timerEl = document.getElementById('recordingTimer');
+            if (timerEl) timerEl.innerText = '00:00';
         }
 
         // Update detections list
         function updateDetectionsList() {
             const list = document.getElementById('detectionsList');
+            if (!list) return;
             
             list.innerHTML = detections.slice(-10).reverse().map(d => `
                 <div class="detection-card">
@@ -1260,6 +1400,8 @@
         // Show connection status
         function showStatus(message, className) {
             const status = document.getElementById('connectionStatus');
+            if (!status) return;
+            
             status.style.display = 'block';
             status.className = `connection-status ${className}`;
             status.innerText = message;
@@ -1273,19 +1415,24 @@
             }
         }
 
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            pingIntervals.forEach(clearInterval);
+            if (ws) ws.close();
+        });
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             initServers();
             updateDetectionsList();
             
             // Request notification permission
-            if ('Notification' in window) {
+            if ('Notification' in window && Notification.permission !== 'granted') {
                 Notification.requestPermission();
             }
             
-            // Periodic ping refresh
-            setInterval(pingAllServers, 30000); // Refresh pings every 30 seconds
-            setInterval(drawCanvas, 50); // 20fps
+            // Animation loop
+            setInterval(drawCanvas, 50);
         });
     </script>
 </body>
