@@ -477,7 +477,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v10.0</h1>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v11.0</h1>
         <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • AFK Prevention • Auto-Spectator</div>
         
         <div class="tournament-banner">
@@ -495,7 +495,7 @@
                 <span style="color: #4ade80;" id="spectatorStatus">Ready</span>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button onclick="sendSpectatorCommand()" id="manualSpectator" class="secondary">📤 MANUAL SPECTATOR</button>
+                <button onclick="manualSpectator()" id="manualSpectator" class="secondary">📤 MANUAL SPECTATOR</button>
                 <button onclick="toggleAFKPrevention()" id="afkToggle" class="secondary">⏱️ AFK: ON</button>
             </div>
         </div>
@@ -613,12 +613,17 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v10.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
-            AFK Prevention Active • Auto-Spectator Mode • Password: rodshot (configurable)
+            TOURNAMENT ANTI-CHEAT SYSTEM v11.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            AFK Prevention Active (1s interval) • Auto-Spectator with Enter key • Password: rodshot
         </div>
     </div>
 
     <script>
+        // ==================== VARINT FUNCTIONS (from Tampermonkey) ====================
+        const r7bit = arr => {let r=0,e=0;for(;35!=e;){let f=arr[e/7];if(r|=(127&f)<<e,0==(128&f))return[r,e/7+1];e+=7}};
+        const int7 = (arr, start) => {let [value, bytes] = r7bit(arr.slice(start)); return [value, start+bytes];};
+        const w7bit = num => {let r=[];for(;num>=128;num>>=7)r.push((128|num)%256);return r.push(num%256),r};
+
         // ==================== TOURNAMENT SERVERS CONFIGURATION ====================
         const TOURNAMENT_SERVERS = {
             'ny': {
@@ -649,95 +654,50 @@
             }
         };
 
-        // ==================== EXACT PACKET FROM WORKING HEX ====================
+        // ==================== EXACT AUTH PACKET ====================
         function createAuthPacket(username, uid, password) {
             let usernameBytes = [];
-            for (let i = 0; i < username.length; i++) {
-                usernameBytes.push(username.charCodeAt(i));
-            }
+            for (let i = 0; i < username.length; i++) usernameBytes.push(username.charCodeAt(i));
             
             let uidBytes = [];
-            for (let i = 0; i < uid.length; i++) {
-                uidBytes.push(uid.charCodeAt(i));
-            }
+            for (let i = 0; i < uid.length; i++) uidBytes.push(uid.charCodeAt(i));
             
             let pwdBytes = [];
-            for (let i = 0; i < password.length; i++) {
-                pwdBytes.push(password.charCodeAt(i));
-            }
+            for (let i = 0; i < password.length; i++) pwdBytes.push(password.charCodeAt(i));
             
-            // Build packet exactly like the working hex with the extra 06 byte
+            // Build packet exactly like working hex
             let packet = [
-                0x08, // field 8 - PacketId
-                0x01, // PacketId = 1
-                0x12, // field 18 - Data
-                0x38, // data length (56 bytes)
-                0x0a, // field 10 - name
-                usernameBytes.length,
-                ...usernameBytes,
-                0x12, // field 18 - uid
-                uidBytes.length,
-                ...uidBytes,
-                0x18, // field 24 - skinId
-                0xe6, // 230
-                0x06, // extra byte from working packet!
-                0x2a, // field 42 - authenticationMethod
-                pwdBytes.length,
-                ...pwdBytes,
-                0x38, // field 56
-                0x01  // value 1
+                0x08, 0x01, 0x12, 0x38, // PacketId=1, Data length 56
+                0x0a, usernameBytes.length, ...usernameBytes,
+                0x12, uidBytes.length, ...uidBytes,
+                0x18, 0xe6, 0x06, // skinId=230 with extra 06
+                0x2a, pwdBytes.length, ...pwdBytes,
+                0x38, 0x01
             ];
             
             return new Uint8Array(packet);
         }
 
+        // ==================== CHAT PACKET (OPEN CHAT + TYPE + ENTER) ====================
         function createChatPacket(message) {
             let msgBytes = [];
-            for (let i = 0; i < message.length; i++) {
-                msgBytes.push(message.charCodeAt(i));
-            }
+            for (let i = 0; i < message.length; i++) msgBytes.push(message.charCodeAt(i));
             
+            // Chat packet structure from the game
             let packet = [
-                0x08, // field 8 - PacketId
-                0x05, // PacketId = 5 (chat)
-                0x12, // field 18 - Data
-                0x0c, // data length
-                0x08, // field 8 - playerId
-                0x00, // playerId = 0
-                0x12, // field 18 - message
-                msgBytes.length,
-                ...msgBytes
+                0x08, 0x05, // PacketId=5 (chat)
+                0x12, 0x0c, // Data length
+                0x08, 0x00, // playerId=0
+                0x12, msgBytes.length, ...msgBytes // message
             ];
             
             return new Uint8Array(packet);
         }
 
-        // ==================== AFK PREVENTION PACKETS ====================
-        function createMovementPacket(direction) {
-            // Simulate a tiny movement to prevent AFK disconnect
-            // Packet ID 7 is movement command
-            let packet = [
-                0x08, // field 8 - PacketId
-                0x07, // PacketId = 7 (movement)
-                0x12, // field 18 - Data
-                0x08, // data length
-                0x08, // field 8 - command
-                0x01, // command = true (moving)
-                0x12, // field 18 - position (placeholder, just tiny movement)
-                0x06, // length
-                0x0d, // x field
-                0x00, // 0 (no movement)
-                0x00,
-                0x00,
-                0x00,
-                0x15, // z field
-                0x00,
-                0x00,
-                0x00,
-                0x00
-            ];
-            
-            return new Uint8Array(packet);
+        // ==================== AFK PREVENTION PACKET (from Tampermonkey) ====================
+        function createAFKPacket() {
+            // Exact packet from the Tampermonkey script: [8,7,18,10,18,5,13,0,0,128,63,24,200,1]
+            return new Uint8Array([8,7,18,10,18,5,13,0,0,128,63,24,200,1]);
         }
 
         // ==================== GAME STATE ====================
@@ -762,6 +722,8 @@
         let authenticated = false;
         let afkInterval = null;
         let afkEnabled = true;
+        let playerId = null;
+        let constId = null;
 
         // ==================== LOGGING SYSTEM ====================
         function addLog(message, type = 'info') {
@@ -777,19 +739,14 @@
                 logContent.scrollTop = logContent.scrollHeight;
             }
             
-            if (logCount) {
-                logCount.innerText = `${logEntries.length} entries`;
-            }
-            
+            if (logCount) logCount.innerText = `${logEntries.length} entries`;
             console.log(`[${time}] ${message}`);
         }
 
         function clearLogs() {
             logEntries = [];
             const logContent = document.getElementById('logContent');
-            if (logContent) {
-                logContent.innerHTML = '<div class="log-entry"><span class="log-time">[SYSTEM]</span> <span class="log-info">Logs cleared.</span></div>';
-            }
+            if (logContent) logContent.innerHTML = '<div class="log-entry"><span class="log-time">[SYSTEM]</span> <span class="log-info">Logs cleared.</span></div>';
             addLog('Logs cleared by user', 'warning');
         }
 
@@ -803,13 +760,8 @@
                 TOURNAMENT_SERVERS.ny.websockets.forEach((ws, index) => {
                     nyDiv.innerHTML += `
                         <div class="server-card" onclick="selectServer('ny', ${index})" id="ny-card-${index}">
-                            <div>
-                                <span class="server-status status-online"></span>
-                                <span class="server-port">${TOURNAMENT_SERVERS.ny.displayNames[index]}</span>
-                            </div>
-                            <div>
-                                <span class="server-ping">ready</span>
-                            </div>
+                            <div><span class="server-status status-online"></span><span class="server-port">${TOURNAMENT_SERVERS.ny.displayNames[index]}</span></div>
+                            <div><span class="server-ping">ready</span></div>
                         </div>
                     `;
                 });
@@ -821,13 +773,8 @@
                 TOURNAMENT_SERVERS.fra.websockets.forEach((ws, index) => {
                     fraDiv.innerHTML += `
                         <div class="server-card" onclick="selectServer('fra', ${index})" id="fra-card-${index}">
-                            <div>
-                                <span class="server-status status-online"></span>
-                                <span class="server-port">${TOURNAMENT_SERVERS.fra.displayNames[index]}</span>
-                            </div>
-                            <div>
-                                <span class="server-ping">ready</span>
-                            </div>
+                            <div><span class="server-status status-online"></span><span class="server-port">${TOURNAMENT_SERVERS.fra.displayNames[index]}</span></div>
+                            <div><span class="server-ping">ready</span></div>
                         </div>
                     `;
                 });
@@ -838,7 +785,6 @@
 
         function selectServer(region, index) {
             document.querySelectorAll('.server-card').forEach(c => c.classList.remove('selected'));
-            
             const selectedCard = document.getElementById(`${region}-card-${index}`);
             if (selectedCard) selectedCard.classList.add('selected');
             
@@ -869,9 +815,7 @@
         function generateUID() {
             const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let result = '';
-            for (let i = 0; i < 28; i++) {
-                result += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
+            for (let i = 0; i < 28; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
             return result;
         }
 
@@ -893,7 +837,6 @@
                 const packet = createAuthPacket(username, uid, password);
                 
                 addLog(`[AUTH] Packet size: ${packet.length} bytes`, 'info');
-                
                 const hexFull = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
                 addLog(`[AUTH] Packet hex: ${hexFull}`, 'info');
                 
@@ -904,16 +847,18 @@
             }
         }
 
+        // ==================== SPECTATOR MODE (with Enter key simulation) ====================
         function sendSpectatorCommand() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
                 return;
             }
             
-            addLog('[SPECTATOR] Sending /team spectator command...', 'info');
-            document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
+            addLog('[SPECTATOR] Opening chat and typing /team spectator...', 'info');
+            document.getElementById('spectatorStatus').innerHTML = 'TYPING...';
             
             try {
+                // Step 1: Send the chat message (this automatically opens chat and sends)
                 const packet = createChatPacket('/team spectator');
                 ws.send(packet);
                 
@@ -929,24 +874,26 @@
             }
         }
 
-        // ==================== AFK PREVENTION ====================
+        function manualSpectator() {
+            sendSpectatorCommand();
+        }
+
+        // ==================== AFK PREVENTION (from Tampermonkey - 1 second interval) ====================
         function startAFKPrevention() {
             if (!afkEnabled) return;
-            
             if (afkInterval) clearInterval(afkInterval);
             
-            addLog('[AFK] Starting AFK prevention (movement every 20 seconds)', 'info');
+            addLog('[AFK] Starting AFK prevention (movement every 1 second)', 'info');
             
             afkInterval = setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
-                    // Send a tiny movement packet to prevent disconnect
-                    const packet = createMovementPacket('none');
+                    const packet = createAFKPacket();
                     ws.send(packet);
                     addLog('[AFK] Sent keep-alive movement', 'info');
                 } else {
                     stopAFKPrevention();
                 }
-            }, 20000); // Every 20 seconds
+            }, 1000); // Every 1 second as per Tampermonkey script
         }
 
         function stopAFKPrevention() {
@@ -960,15 +907,10 @@
         function toggleAFKPrevention() {
             afkEnabled = !afkEnabled;
             const btn = document.getElementById('afkToggle');
-            if (btn) {
-                btn.innerHTML = afkEnabled ? '⏱️ AFK: ON' : '⏱️ AFK: OFF';
-            }
+            if (btn) btn.innerHTML = afkEnabled ? '⏱️ AFK: ON' : '⏱️ AFK: OFF';
             
-            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN) {
-                startAFKPrevention();
-            } else {
-                stopAFKPrevention();
-            }
+            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN) startAFKPrevention();
+            else stopAFKPrevention();
             
             addLog(`[AFK] AFK prevention ${afkEnabled ? 'enabled' : 'disabled'}`, 'info');
         }
@@ -1003,6 +945,8 @@
             boostHistory.clear();
             packetCount = 0;
             authenticated = false;
+            playerId = null;
+            constId = null;
             
             addLog(`[CONNECTION] Connecting to ${selectedServer?.displayName}...`, 'info');
             showStatus(`CONNECTING...`, 'status-connecting');
@@ -1028,9 +972,7 @@
                     document.getElementById('disconnectBtn').disabled = false;
                     document.getElementById('gameView').style.display = 'block';
                     
-                    // Send authentication
                     sendAuthentication(password);
-                    
                     startRecording();
                 };
                 
@@ -1038,21 +980,15 @@
                     const data = new Uint8Array(event.data);
                     packetCount++;
                     
-                    // If we receive packet type 2 (game state), we're authenticated!
+                    // Packet type 2 = game state (authentication successful)
                     if (data[1] === 2 && !authenticated) {
                         authenticated = true;
                         addLog('[AUTH] ✅ Authentication successful!', 'success');
                         
-                        // Now send spectator command
+                        // Send spectator command after successful auth
                         if (document.getElementById('autoSpectator').checked) {
                             setTimeout(sendSpectatorCommand, 1000);
                         }
-                    }
-                    
-                    // Try to parse player data for detection
-                    if (data[1] === 2 || data[1] === 8) {
-                        // Parse player positions here for detection
-                        // This would be expanded with the BR decoder
                     }
                 };
                 
@@ -1213,10 +1149,7 @@
                 `${d.timestamp},${d.playerName},${d.team},${d.confidence},${d.boostCount},${d.matchRatio}`
             ).join('\n');
             
-            const blob = new Blob([
-                'Timestamp,Player,Team,Confidence,BoostCount,MatchRatio\n' + csv
-            ], { type: 'text/csv' });
-            
+            const blob = new Blob(['Timestamp,Player,Team,Confidence,BoostCount,MatchRatio\n' + csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1255,10 +1188,10 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v10.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v11.0 initialized', 'success');
             addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
-            addLog('[SYSTEM] AFK Prevention active (movement every 20s)', 'info');
+            addLog('[SYSTEM] AFK Prevention active (1s interval from Tampermonkey)', 'info');
         });
 
         window.addEventListener('beforeunload', () => {
