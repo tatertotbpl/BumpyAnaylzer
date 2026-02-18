@@ -3,7 +3,6 @@
 <head>
     <title>BumpyBall Tournament Anti-Cheat Analyzer</title>
     <style>
-        /* Keep all the existing CSS from v16.0 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -481,8 +480,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v17.0</h1>
-        <div class="subtitle">Professional Grade • Working Auth • Full BR Decoder • Auto-Backboost Detection</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v18.0</h1>
+        <div class="subtitle">Professional Grade • Working Auth • Fixed Spectator • Full BR Decoder</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -496,7 +495,7 @@
                     <input type="checkbox" id="autoSpectator" checked>
                     <span class="toggle-slider"></span>
                 </label>
-                <span style="color: #4ade80;" id="spectatorStatus">Waiting for game state...</span>
+                <span style="color: #4ade80;" id="spectatorStatus">Waiting for player ID...</span>
             </div>
             <div style="display: flex; gap: 10px;">
                 <button onclick="manualSpectator()" id="manualSpectator" class="secondary">👁️ GO SPECTATOR</button>
@@ -618,8 +617,8 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v17.0 • WORKING AUTH • FULL BR DECODER • AUTO-BACKBOOST DETECTION<br>
-            Logs all player movements • AFK Prevention • Password: rodshot
+            TOURNAMENT ANTI-CHEAT SYSTEM v18.0 • WORKING AUTH • FIXED SPECTATOR • FULL BR DECODER<br>
+            Uses actual player ID for commands • AFK Prevention • Password: rodshot
         </div>
     </div>
 
@@ -972,38 +971,34 @@
 
         // ==================== WORKING MANUAL AUTH PACKET ====================
         function createAuthPacket(username, uid, password) {
-            // Working packet from earlier: 60 bytes, connects successfully
             let usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
             let uidBytes = Array.from(uid).map(c => c.charCodeAt(0));
             let pwdBytes = Array.from(password).map(c => c.charCodeAt(0));
             
-            // Build exactly like the working packet from v13.0
-            let packet = [
+            return new Uint8Array([
                 0x08, 0x01, 0x12, 0x38,
                 0x0a, usernameBytes.length, ...usernameBytes,
                 0x12, uidBytes.length, ...uidBytes,
                 0x18, 0xe6, 0x06,
                 0x2a, pwdBytes.length, ...pwdBytes,
                 0x38, 0x01
-            ];
-            
-            return new Uint8Array(packet);
+            ]);
         }
 
-        // ==================== SPECTATOR PACKET ====================
-        function createSpectatorPacket() {
+        // ==================== FIXED SPECTATOR PACKET (uses actual player ID) ====================
+        function createSpectatorPacket(playerId) {
             let msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
+            let idBytes = w7bit(playerId);
             
             return new Uint8Array([
                 0x08, 0x05, 0x12, 0x0c,
-                0x08, 0x00,
+                0x08, ...idBytes,
                 0x12, msgBytes.length, ...msgBytes
             ]);
         }
 
         // ==================== AFK PACKET ====================
         function createAFKPacket(playerId) {
-            // Base AFK packet from Tampermonkey
             let basePacket = [0x08, 0x07, 0x12, 0x0a, 0x18, 0x05, 0x13, 0x00, 0x00, 0x80, 0x3f, 0x24];
             let idBytes = w7bit(playerId || 1);
             return new Uint8Array([...basePacket, ...idBytes]);
@@ -1065,6 +1060,7 @@
         let playerId = null;
         let constId = null;
         let lastBoostTime = new Map();
+        let spectatorSent = false;
 
         // ==================== LOGGING SYSTEM ====================
         function addLog(message, type = 'info') {
@@ -1205,15 +1201,30 @@
                 return;
             }
             
-            addLog('[SPECTATOR] Sending /team spectator command...', 'info');
+            if (!playerId) {
+                addLog('[ERROR] No player ID yet - waiting for game state', 'error');
+                document.getElementById('spectatorStatus').innerHTML = '⚠️ WAITING FOR ID';
+                return;
+            }
+            
+            if (spectatorSent) {
+                addLog('[SPECTATOR] Already sent spectator command', 'info');
+                return;
+            }
+            
+            addLog(`[SPECTATOR] Sending /team spectator command with player ID: ${playerId}...`, 'info');
             document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
             
             try {
-                const packet = createSpectatorPacket();
+                const packet = createSpectatorPacket(playerId);
                 ws.send(packet);
                 
+                spectatorSent = true;
                 addLog('[SPECTATOR] ✅ Spectator command sent', 'success');
                 document.getElementById('spectatorStatus').innerHTML = '✅ SPECTATOR MODE';
+                
+                // Start AFK prevention after spectator command
+                setTimeout(() => startAFKPrevention(), 500);
                 
             } catch (e) {
                 addLog(`[ERROR] Failed to send spectator command: ${e.message}`, 'error');
@@ -1222,6 +1233,10 @@
         }
 
         function manualSpectator() {
+            if (!playerId) {
+                addLog('[MANUAL] Cannot send spectator - No player ID yet', 'warning');
+                return;
+            }
             addLog('[MANUAL] Manual spectator command triggered', 'info');
             sendSpectatorCommand();
         }
@@ -1313,10 +1328,8 @@
             if (packet.Data.entities && packet.Data.entities.list) {
                 packet.Data.entities.list.forEach(entity => {
                     if (entity.entity && entity.entity.entityType === 1) {
-                        // Ball
                         ball = entity.entity.position;
                     } else if (entity.entity && entity.entity.playerId) {
-                        // Player car
                         let player = players.get(entity.entity.playerId);
                         if (player && entity.entity.position) {
                             player.x = entity.entity.position.x;
@@ -1336,6 +1349,12 @@
             if (packet.Data.playerId && !playerId) {
                 playerId = packet.Data.playerId;
                 addLog(`[AUTH] Player ID: ${playerId}`, 'success');
+                document.getElementById('spectatorStatus').innerHTML = `✅ ID: ${playerId}`;
+                
+                // Auto spectator if enabled
+                if (document.getElementById('autoSpectator').checked && !spectatorSent) {
+                    setTimeout(sendSpectatorCommand, 1000);
+                }
             }
         }
 
@@ -1451,6 +1470,7 @@
             authenticated = false;
             playerId = null;
             constId = null;
+            spectatorSent = false;
             
             addLog(`[CONNECTION] Connecting to ${selectedServer?.displayName}...`, 'info');
             showStatus(`CONNECTING...`, 'status-connecting');
@@ -1485,7 +1505,6 @@
                     packetCount++;
                     
                     try {
-                        // Decode packet using BR decoder
                         const br = new BR();
                         let packets;
                         
@@ -1497,30 +1516,22 @@
                         
                         if (!packets) return;
                         
-                        // Handle each packet
                         Object.values(packets).forEach(packet => {
                             if (!packet || !packet.PacketId) return;
                             
                             const packetId = packet.PacketId;
                             
-                            if (packetId === 2) { // Game state
+                            if (packetId === 2) {
                                 if (!authenticated) {
                                     authenticated = true;
                                     addLog('[AUTH] ✅ Authentication successful!', 'success');
-                                    
-                                    if (document.getElementById('autoSpectator').checked) {
-                                        setTimeout(() => {
-                                            sendSpectatorCommand();
-                                            setTimeout(() => startAFKPrevention(), 500);
-                                        }, 1000);
-                                    }
                                 }
                                 handleGameState(packet);
                                 
-                            } else if (packetId === 7) { // Movement/boost
+                            } else if (packetId === 7) {
                                 handleMovement(packet);
                                 
-                            } else if (packetId === 8) { // Entity update
+                            } else if (packetId === 8) {
                                 if (packet.Data && packet.Data.entity) {
                                     if (packet.Data.entity.entityType === 1) {
                                         ball = packet.Data.entity.position;
@@ -1536,12 +1547,11 @@
                             }
                         });
                         
-                        // Update UI
                         drawCanvas();
                         updatePlayerList();
                         
                     } catch (e) {
-                        // Silent fail on parse errors
+                        // Silent fail
                     }
                 };
                 
@@ -1616,7 +1626,6 @@
             ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
             ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
             
-            // Draw players
             players.forEach(player => {
                 if (player.x === undefined || player.z === undefined) return;
                 
@@ -1639,7 +1648,6 @@
                 ctx.fillText(player.name || '?', x - 20, y - 20);
             });
             
-            // Draw ball
             if (ball.x !== undefined && ball.z !== undefined) {
                 let x = (ball.x / 50) * canvas.width/2 + canvas.width/2;
                 let y = (ball.z / 50) * canvas.height/2 + canvas.height/2;
@@ -1794,9 +1802,9 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v17.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v18.0 initialized', 'success');
             addLog('[SYSTEM] Working manual auth packet (60 bytes)', 'info');
-            addLog('[SYSTEM] Full BR decoder for parsing', 'info');
+            addLog('[SYSTEM] Fixed spectator command (uses player ID)', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
         });
 
