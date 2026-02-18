@@ -269,6 +269,7 @@
         .log-success { color: #4ade80; font-weight: bold; }
         .log-movement { color: #3b82f6; }
         .log-player { color: #a855f7; }
+        .log-goal { color: #fbbf24; font-weight: bold; }
         
         .game-view {
             background: #1a1a2e;
@@ -480,8 +481,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v18.0</h1>
-        <div class="subtitle">Professional Grade • Working Auth • Fixed Spectator • Full BR Decoder</div>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v19.0</h1>
+        <div class="subtitle">Professional Grade • Packet 13 Team Change • Full Player Tracking • Goal Recording • AFK Movement</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -551,6 +552,7 @@
                 <button onclick="connectToSelected()" id="connectBtn" disabled>🚀 CONNECT TO SERVER</button>
                 <button onclick="disconnect()" id="disconnectBtn" class="secondary" disabled>🔌 DISCONNECT</button>
                 <button onclick="clearLogs()" id="clearLogsBtn" class="secondary">🗑 CLEAR LOGS</button>
+                <button onclick="exportRecording()" id="exportBtn" class="secondary">💾 EXPORT RECORDING</button>
             </div>
             
             <div id="connectionStatus" class="connection-status" style="display: none;"></div>
@@ -617,8 +619,8 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v18.0 • WORKING AUTH • FIXED SPECTATOR • FULL BR DECODER<br>
-            Uses actual player ID for commands • AFK Prevention • Password: rodshot
+            TOURNAMENT ANTI-CHEAT SYSTEM v19.0 • PACKET 13 TEAM CHANGE • FULL PLAYER TRACKING • GOAL RECORDING • AFK MOVEMENT<br>
+            Tracks all players, positions, goals, and boost patterns • Password: rodshot
         </div>
     </div>
 
@@ -985,23 +987,32 @@
             ]);
         }
 
-        // ==================== FIXED SPECTATOR PACKET (uses actual player ID) ====================
-        function createSpectatorPacket(playerId) {
-            let msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
+        // ==================== PACKET 13 TEAM CHANGE ====================
+        function createTeamChangePacket(playerId, team) {
+            // team: 0=red, 1=blue, 2=spectator, 3=ghost
             let idBytes = w7bit(playerId);
+            let teamBytes = w7bit(team);
             
             return new Uint8Array([
-                0x08, 0x05, 0x12, 0x0c,
-                0x08, ...idBytes,
-                0x12, msgBytes.length, ...msgBytes
+                0x08, 0x0d, 0x12, 0x06,
+                0x08, ...teamBytes,
+                0x10, ...idBytes
             ]);
         }
 
-        // ==================== AFK PACKET ====================
+        // ==================== AFK MOVEMENT PACKET ====================
         function createAFKPacket(playerId) {
-            let basePacket = [0x08, 0x07, 0x12, 0x0a, 0x18, 0x05, 0x13, 0x00, 0x00, 0x80, 0x3f, 0x24];
-            let idBytes = w7bit(playerId || 1);
-            return new Uint8Array([...basePacket, ...idBytes]);
+            // Small movement to prevent AFK disconnect
+            let idBytes = w7bit(playerId);
+            
+            return new Uint8Array([
+                0x08, 0x07, 0x12, 0x0a,
+                0x08, 0x01, // command = true
+                0x12, 0x06, // position
+                0x0d, 0x00, 0x00, 0x00, 0x00, // x = 0
+                0x15, 0x00, 0x00, 0x00, 0x00, // z = 0
+                0x18, ...idBytes // player ID
+            ]);
         }
 
         // ==================== TOURNAMENT SERVERS CONFIGURATION ====================
@@ -1037,12 +1048,12 @@
         // ==================== GAME STATE ====================
         let ws = null;
         let players = new Map();
-        let playerNames = new Map();
         let ball = { x: 0, z: 0 };
         let gameState = {
             timeRemaining: 300,
             redScore: 0,
-            blueScore: 0
+            blueScore: 0,
+            gameState: 0
         };
         
         let boostHistory = new Map();
@@ -1058,7 +1069,7 @@
         let afkEnabled = true;
         let movementLogging = true;
         let playerId = null;
-        let constId = null;
+        let entityToPlayer = new Map();
         let lastBoostTime = new Map();
         let spectatorSent = false;
 
@@ -1075,6 +1086,7 @@
                                 type === 'warning' ? 'log-warning' : 
                                 type === 'movement' ? 'log-movement' :
                                 type === 'player' ? 'log-player' :
+                                type === 'goal' ? 'log-goal' :
                                 type === 'success' ? 'log-success' : 'log-info';
                 logContent.innerHTML += `<div class="log-entry"><span class="log-time">[${time}]</span> <span class="${logClass}">${message}</span></div>`;
                 logContent.scrollTop = logContent.scrollHeight;
@@ -1194,7 +1206,7 @@
             }
         }
 
-        // ==================== SPECTATOR MODE ====================
+        // ==================== SPECTATOR MODE (Packet 13) ====================
         function sendSpectatorCommand() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
@@ -1212,19 +1224,20 @@
                 return;
             }
             
-            addLog(`[SPECTATOR] Sending /team spectator command with player ID: ${playerId}...`, 'info');
-            document.getElementById('spectatorStatus').innerHTML = 'SENDING...';
+            addLog(`[SPECTATOR] Switching player ${playerId} to spectator mode (Packet 13)...`, 'info');
+            document.getElementById('spectatorStatus').innerHTML = 'SWITCHING...';
             
             try {
-                const packet = createSpectatorPacket(playerId);
+                // Use Packet 13 for team change (team 2 = spectator)
+                const packet = createTeamChangePacket(playerId, 2);
                 ws.send(packet);
                 
                 spectatorSent = true;
-                addLog('[SPECTATOR] ✅ Spectator command sent', 'success');
+                addLog('[SPECTATOR] ✅ Team change to spectator sent', 'success');
                 document.getElementById('spectatorStatus').innerHTML = '✅ SPECTATOR MODE';
                 
-                // Start AFK prevention after spectator command
-                setTimeout(() => startAFKPrevention(), 500);
+                // Start AFK prevention after switching
+                setTimeout(() => startAFKPrevention(), 1000);
                 
             } catch (e) {
                 addLog(`[ERROR] Failed to send spectator command: ${e.message}`, 'error');
@@ -1252,10 +1265,11 @@
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     const packet = createAFKPacket(playerId);
                     ws.send(packet);
+                    if (movementLogging) addLog('[AFK] Sent keep-alive movement', 'info');
                 } else {
                     stopAFKPrevention();
                 }
-            }, 1000);
+            }, 5000); // Every 5 seconds
         }
 
         function stopAFKPrevention() {
@@ -1299,27 +1313,36 @@
                 }
             }
             
-            // Update players
+            // Update players list
             if (packet.Data.players && packet.Data.players.list) {
                 packet.Data.players.list.forEach(playerData => {
                     let player = players.get(playerData.id) || {
                         id: playerData.id,
                         boosts: [],
-                        suspicious: false
+                        suspicious: false,
+                        goals: 0,
+                        assists: 0,
+                        team: 2,
+                        name: 'Unknown'
                     };
                     
-                    player.name = playerData.name;
-                    player.team = playerData.team;
-                    player.goals = playerData.goals || 0;
-                    player.assists = playerData.assits || 0;
-                    player.bot = playerData.bot || false;
-                    player.skin = playerData.skinId;
+                    player.name = playerData.name || player.name;
+                    player.team = playerData.team !== undefined ? playerData.team : player.team;
+                    player.goals = playerData.goals || player.goals;
+                    player.assists = playerData.assits || player.assists;
+                    player.bot = playerData.bot || player.bot || false;
+                    player.skin = playerData.skinId || player.skin;
                     
                     players.set(playerData.id, player);
                     
-                    if (movementLogging) {
+                    if (movementLogging && playerData.name) {
                         let teamName = player.team === 0 ? '🔴' : player.team === 1 ? '🔵' : '👁️';
-                        addLog(`${teamName} ${player.name || 'Unknown'} joined (Team ${player.team})`, 'player');
+                        addLog(`${teamName} ${player.name} joined (Team ${player.team}) | Goals: ${player.goals}`, 'player');
+                    }
+                    
+                    // Check for goals
+                    if (playerData.goals > 0) {
+                        addLog(`⚽ GOAL! ${player.name} scored! Total: ${playerData.goals}`, 'goal');
                     }
                 });
             }
@@ -1327,19 +1350,30 @@
             // Update entities (positions)
             if (packet.Data.entities && packet.Data.entities.list) {
                 packet.Data.entities.list.forEach(entity => {
-                    if (entity.entity && entity.entity.entityType === 1) {
-                        ball = entity.entity.position;
-                    } else if (entity.entity && entity.entity.playerId) {
+                    if (!entity.entity) return;
+                    
+                    if (entity.entity.entityType === 1) {
+                        // Ball
+                        ball = entity.entity.position || ball;
+                        if (movementLogging && ball.x && ball.z) {
+                            addLog(`⚪ Ball at (${ball.x.toFixed(2)}, ${ball.z.toFixed(2)})`, 'movement');
+                        }
+                    } else if (entity.entity.playerId) {
+                        // Player car
                         let player = players.get(entity.entity.playerId);
-                        if (player && entity.entity.position) {
-                            player.x = entity.entity.position.x;
-                            player.z = entity.entity.position.z;
-                            players.set(entity.entity.playerId, player);
-                            
-                            if (movementLogging && player.name) {
-                                let teamName = player.team === 0 ? '🔴' : player.team === 1 ? '🔵' : '👁️';
-                                addLog(`${teamName} ${player.name} moved to (${player.x.toFixed(2)}, ${player.z.toFixed(2)})`, 'movement');
+                        if (player) {
+                            if (entity.entity.position) {
+                                player.x = entity.entity.position.x;
+                                player.z = entity.entity.position.z;
+                                players.set(entity.entity.playerId, player);
+                                
+                                if (movementLogging && player.name) {
+                                    let teamName = player.team === 0 ? '🔴' : player.team === 1 ? '🔵' : '👁️';
+                                    addLog(`${teamName} ${player.name} moved to (${player.x.toFixed(2)}, ${player.z.toFixed(2)})`, 'movement');
+                                }
                             }
+                            // Store entity ID mapping for boosts
+                            entityToPlayer.set(entity.id, player.id);
                         }
                     }
                 });
@@ -1353,7 +1387,7 @@
                 
                 // Auto spectator if enabled
                 if (document.getElementById('autoSpectator').checked && !spectatorSent) {
-                    setTimeout(sendSpectatorCommand, 1000);
+                    setTimeout(sendSpectatorCommand, 2000);
                 }
             }
         }
@@ -1362,37 +1396,34 @@
             if (!packet.Data || !packet.Data.EID) return;
             
             const now = Date.now();
-            let player = null;
             
-            // Find player by EID
-            for (let [id, p] of players) {
-                if (p.eid === packet.Data.EID) {
-                    player = p;
-                    break;
-                }
-            }
+            // Find player by entity ID
+            const playerId = entityToPlayer.get(packet.Data.EID);
+            if (!playerId) return;
             
+            let player = players.get(playerId);
             if (!player) return;
             
-            if (!boostHistory.has(player.id)) {
-                boostHistory.set(player.id, []);
+            if (!boostHistory.has(playerId)) {
+                boostHistory.set(playerId, []);
             }
             
-            let boosts = boostHistory.get(player.id);
-            let lastBoost = lastBoostTime.get(player.id) || 0;
+            let boosts = boostHistory.get(playerId);
+            let lastBoost = lastBoostTime.get(playerId) || 0;
             let interval = now - lastBoost;
             
             boosts.push(now);
             if (boosts.length > 20) boosts.shift();
             
             player.boosts = boosts;
-            lastBoostTime.set(player.id, now);
+            lastBoostTime.set(playerId, now);
             
-            if (movementLogging && interval > 0) {
-                addLog(`⚡ ${player.name} boosted (interval: ${interval}ms)`, 'player');
+            if (movementLogging && interval > 0 && interval < 1000) {
+                let teamName = player.team === 0 ? '🔴' : player.team === 1 ? '🔵' : '👁️';
+                addLog(`⚡ ${teamName} ${player.name} boosted (interval: ${interval}ms)`, 'player');
             }
             
-            // Check for 130ms pattern
+            // Check for 130ms cheat pattern
             if (boosts.length >= 8) {
                 let suspicious = 0;
                 for (let i = 1; i < boosts.length; i++) {
@@ -1407,8 +1438,23 @@
                 }
             }
             
-            players.set(player.id, player);
-            boostHistory.set(player.id, boosts);
+            players.set(playerId, player);
+            boostHistory.set(playerId, boosts);
+        }
+
+        function handleTeamChange(packet) {
+            if (!packet.Data) return;
+            
+            const { team, id } = packet.Data;
+            let player = players.get(id);
+            
+            if (player) {
+                let oldTeam = player.team;
+                player.team = team;
+                players.set(id, player);
+                
+                addLog(`[TEAM] ${player.name} switched from team ${oldTeam} to team ${team}`, 'player');
+            }
         }
 
         function detectCheater(player, boosts, ratio) {
@@ -1463,13 +1509,12 @@
             stopAFKPrevention();
             
             players.clear();
-            playerNames.clear();
+            entityToPlayer.clear();
             boostHistory.clear();
             lastBoostTime.clear();
             packetCount = 0;
             authenticated = false;
             playerId = null;
-            constId = null;
             spectatorSent = false;
             
             addLog(`[CONNECTION] Connecting to ${selectedServer?.displayName}...`, 'info');
@@ -1532,18 +1577,32 @@
                                 handleMovement(packet);
                                 
                             } else if (packetId === 8) {
-                                if (packet.Data && packet.Data.entity) {
-                                    if (packet.Data.entity.entityType === 1) {
-                                        ball = packet.Data.entity.position;
-                                    } else if (packet.Data.entity.playerId) {
-                                        let player = players.get(packet.Data.entity.playerId);
-                                        if (player && packet.Data.entity.position) {
-                                            player.x = packet.Data.entity.position.x;
-                                            player.z = packet.Data.entity.position.z;
-                                            players.set(packet.Data.entity.playerId, player);
-                                        }
+                                // Entity updates - already handled in game state
+                                if (packet.Data?.entity?.playerId && packet.Data?.entity?.position) {
+                                    let player = players.get(packet.Data.entity.playerId);
+                                    if (player) {
+                                        player.x = packet.Data.entity.position.x;
+                                        player.z = packet.Data.entity.position.z;
+                                        players.set(packet.Data.entity.playerId, player);
                                     }
                                 }
+                                
+                            } else if (packetId === 12) {
+                                // Game state update
+                                if (packet.Data?.timeRemaining !== undefined) {
+                                    gameState.timeRemaining = packet.Data.timeRemaining;
+                                    updateGameTime();
+                                }
+                                if (packet.Data?.teams) {
+                                    packet.Data.teams.forEach(team => {
+                                        if (team.teamId === 0) gameState.redScore = team.score;
+                                        if (team.teamId === 1) gameState.blueScore = team.score;
+                                    });
+                                    updateScores();
+                                }
+                                
+                            } else if (packetId === 13) {
+                                handleTeamChange(packet);
                             }
                         });
                         
@@ -1597,6 +1656,91 @@
             }
         }
 
+        // ==================== RECORDING ====================
+        function startRecording() {
+            recordingStartTime = Date.now();
+            currentRecording = {
+                id: Date.now(),
+                startTime: recordingStartTime,
+                server: selectedServer?.displayName,
+                packets: [],
+                players: new Map(),
+                goals: [],
+                boosts: []
+            };
+            
+            addLog('[RECORDING] Started packet recording', 'success');
+            
+            if (recordingInterval) clearInterval(recordingInterval);
+            recordingInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                const timerEl = document.getElementById('recordingTimer');
+                if (timerEl) timerEl.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function stopRecording() {
+            if (recordingInterval) {
+                clearInterval(recordingInterval);
+                recordingInterval = null;
+            }
+            
+            if (currentRecording) {
+                addLog(`[RECORDING] Stopped - Captured ${currentRecording.packets.length} packets`, 'info');
+                
+                // Save recording to localStorage
+                const recordings = JSON.parse(localStorage.getItem('tournamentRecordings') || '[]');
+                recordings.push({
+                    id: currentRecording.id,
+                    server: currentRecording.server,
+                    timestamp: new Date().toISOString(),
+                    packetCount: currentRecording.packets.length,
+                    duration: Date.now() - currentRecording.startTime,
+                    playerCount: players.size
+                });
+                localStorage.setItem('tournamentRecordings', JSON.stringify(recordings));
+                
+                currentRecording = null;
+            }
+            
+            const timerEl = document.getElementById('recordingTimer');
+            if (timerEl) timerEl.innerText = '00:00';
+        }
+
+        function exportRecording() {
+            if (!currentRecording || currentRecording.packets.length === 0) {
+                addLog('[EXPORT] No recording to export', 'warning');
+                return;
+            }
+            
+            const recordingData = {
+                timestamp: new Date().toISOString(),
+                server: selectedServer?.displayName,
+                duration: Date.now() - recordingStartTime,
+                packetCount: currentRecording.packets.length,
+                players: Array.from(players.values()).map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    team: p.team,
+                    goals: p.goals,
+                    assists: p.assists,
+                    suspicious: p.suspicious
+                })),
+                detections: detections.filter(d => d.server === selectedServer?.displayName)
+            };
+            
+            const blob = new Blob([JSON.stringify(recordingData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `recording-${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.json`;
+            a.click();
+            
+            addLog(`[EXPORT] Exported recording with ${recordingData.packetCount} packets`, 'success');
+        }
+
         // ==================== UI UPDATES ====================
         function drawCanvas() {
             const canvas = document.getElementById('gameCanvas');
@@ -1605,9 +1749,11 @@
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
+            // Draw field
             ctx.fillStyle = '#0a0a0f';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
+            // Center line
             ctx.strokeStyle = '#e94560';
             ctx.lineWidth = 2;
             ctx.setLineDash([10, 10]);
@@ -1616,16 +1762,19 @@
             ctx.lineTo(canvas.width/2, canvas.height);
             ctx.stroke();
             
+            // Center circle
             ctx.setLineDash([]);
             ctx.beginPath();
             ctx.arc(canvas.width/2, canvas.height/2, 80, 0, Math.PI * 2);
             ctx.strokeStyle = '#e94560';
             ctx.stroke();
             
+            // Goals
             ctx.fillStyle = '#e94560';
             ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
             ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
             
+            // Draw players
             players.forEach(player => {
                 if (player.x === undefined || player.z === undefined) return;
                 
@@ -1648,6 +1797,7 @@
                 ctx.fillText(player.name || '?', x - 20, y - 20);
             });
             
+            // Draw ball
             if (ball.x !== undefined && ball.z !== undefined) {
                 let x = (ball.x / 50) * canvas.width/2 + canvas.width/2;
                 let y = (ball.z / 50) * canvas.height/2 + canvas.height/2;
@@ -1681,6 +1831,7 @@
                         <span>
                             ${teamName} | 
                             Goals: ${player.goals || 0} |
+                            Assists: ${player.assists || 0} |
                             Boosts: ${boosts.length} |
                             ${suspiciousRate}% 130ms
                         </span>
@@ -1718,52 +1869,17 @@
                     </div>
                     <div>Confidence: ${d.confidence.toFixed(1)}% (${(d.matchRatio*100).toFixed(1)}% at 130ms)</div>
                     <div>Boosts: ${d.boostCount}</div>
+                    <div>Server: ${d.server}</div>
                 </div>
             `).join('');
         }
 
-        function startRecording() {
-            recordingStartTime = Date.now();
-            currentRecording = {
-                id: Date.now(),
-                startTime: recordingStartTime,
-                server: selectedServer?.displayName,
-                packets: []
-            };
-            
-            addLog('[RECORDING] Started packet recording', 'success');
-            
-            if (recordingInterval) clearInterval(recordingInterval);
-            recordingInterval = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-                const mins = Math.floor(elapsed / 60);
-                const secs = elapsed % 60;
-                const timerEl = document.getElementById('recordingTimer');
-                if (timerEl) timerEl.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            }, 1000);
-        }
-
-        function stopRecording() {
-            if (recordingInterval) {
-                clearInterval(recordingInterval);
-                recordingInterval = null;
-            }
-            
-            if (currentRecording) {
-                addLog(`[RECORDING] Stopped - Captured ${currentRecording.packets.length} packets`, 'info');
-                currentRecording = null;
-            }
-            
-            const timerEl = document.getElementById('recordingTimer');
-            if (timerEl) timerEl.innerText = '00:00';
-        }
-
         function exportDetections() {
             const csv = detections.map(d => 
-                `${d.timestamp},${d.playerName},${d.team},${d.confidence},${d.boostCount},${d.matchRatio}`
+                `${d.timestamp},${d.playerName},${d.team},${d.confidence},${d.boostCount},${d.matchRatio},${d.server}`
             ).join('\n');
             
-            const blob = new Blob(['Timestamp,Player,Team,Confidence,BoostCount,MatchRatio\n' + csv], { type: 'text/csv' });
+            const blob = new Blob(['Timestamp,Player,Team,Confidence,BoostCount,MatchRatio,Server\n' + csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1802,9 +1918,11 @@
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v18.0 initialized', 'success');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v19.0 initialized', 'success');
             addLog('[SYSTEM] Working manual auth packet (60 bytes)', 'info');
-            addLog('[SYSTEM] Fixed spectator command (uses player ID)', 'info');
+            addLog('[SYSTEM] Packet 13 team change for spectator', 'info');
+            addLog('[SYSTEM] Full player tracking with goals and assists', 'info');
+            addLog('[SYSTEM] AFK movement every 5 seconds', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
         });
 
