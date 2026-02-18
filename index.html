@@ -477,11 +477,11 @@
 </head>
 <body>
     <div class="container">
-        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v3.0</h1>
+        <h1>🏆 TOURNAMENT ANTI-CHEAT ANALYZER v4.0</h1>
         <div class="subtitle">Professional Grade • Auto-Backboost Detection • 8 Tournament Servers • Packet Logging</div>
         
         <div class="tournament-banner">
-            ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD REQUIRED
+            ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
         </div>
         
         <!-- Spectator Controls -->
@@ -532,10 +532,11 @@
                 <input type="password" 
                        id="serverPassword" 
                        class="password-input" 
-                       placeholder="Enter server password (required)" 
+                       placeholder="Enter server password" 
+                       value="rodshot"
                        autocomplete="off">
                 <div style="color: #fbbf24; font-size: 12px; margin-top: 5px;">
-                    ⚠️ Tournament servers require password authentication
+                    ⚠️ Tournament password is: rodshot (can be changed)
                 </div>
             </div>
             
@@ -609,41 +610,41 @@
         </div>
         
         <div class="footer">
-            TOURNAMENT ANTI-CHEAT SYSTEM v3.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
-            © 2024 Tournament Anti-Cheat • All detections are logged locally
+            TOURNAMENT ANTI-CHEAT SYSTEM v4.0 • MONITORING 8 TOURNAMENT SERVERS • AUTO-BACKBOOST DETECTION (130ms PATTERN)<br>
+            © 2024 Tournament Anti-Cheat • Password: rodshot (configurable)
         </div>
     </div>
 
     <script>
-// ==================== TOURNAMENT SERVERS CONFIGURATION ====================
-const TOURNAMENT_SERVERS = {
-    'ny': {
-        name: 'NEW YORK TOURNAMENT',
-        location: 'New York, USA',
-        flag: '🇺🇸',
-        color: '#ef4444',
-        websockets: [
-            'wss://community-01.usemapsettings.com:8086/server',
-            'wss://community-01.usemapsettings.com:8087/server',
-            'wss://community-01.usemapsettings.com:8088/server',
-            'wss://community-01.usemapsettings.com:8089/server'
-        ],
-        displayNames: ['NY-8086', 'NY-8087', 'NY-8088', 'NY-8089']
-    },
-    'fra': {
-        name: 'FRANKFURT TOURNAMENT',
-        location: 'Frankfurt, Germany',
-        flag: '🇩🇪',
-        color: '#3b82f6',
-        websockets: [
-            'wss://community-02.usemapsettings.com:8086/server',
-            'wss://community-02.usemapsettings.com:8087/server',
-            'wss://community-02.usemapsettings.com:8088/server',
-            'wss://community-02.usemapsettings.com:8089/server'
-        ],
-        displayNames: ['FRA-8086', 'FRA-8087', 'FRA-8088', 'FRA-8089']
-    }
-};
+        // ==================== TOURNAMENT SERVERS CONFIGURATION ====================
+        const TOURNAMENT_SERVERS = {
+            'ny': {
+                name: 'NEW YORK TOURNAMENT',
+                location: 'New York, USA',
+                flag: '🇺🇸',
+                color: '#ef4444',
+                websockets: [
+                    'wss://community-01.usemapsettings.com:8086/server',
+                    'wss://community-01.usemapsettings.com:8087/server',
+                    'wss://community-01.usemapsettings.com:8088/server',
+                    'wss://community-01.usemapsettings.com:8089/server'
+                ],
+                displayNames: ['NY-8086', 'NY-8087', 'NY-8088', 'NY-8089']
+            },
+            'fra': {
+                name: 'FRANKFURT TOURNAMENT',
+                location: 'Frankfurt, Germany',
+                flag: '🇩🇪',
+                color: '#3b82f6',
+                websockets: [
+                    'wss://community-02.usemapsettings.com:8086/server',
+                    'wss://community-02.usemapsettings.com:8087/server',
+                    'wss://community-02.usemapsettings.com:8088/server',
+                    'wss://community-02.usemapsettings.com:8089/server'
+                ],
+                displayNames: ['FRA-8086', 'FRA-8087', 'FRA-8088', 'FRA-8089']
+            }
+        };
 
         // ==================== PACKET DECODER (from cheat script) ====================
         class BR {
@@ -688,10 +689,8 @@ const TOURNAMENT_SERVERS = {
                     18: ["Data", "dict", {
                         10: ["name", "string"],
                         18: ["uid", "string"],
-                        24: ["version", "uint"],
                         32: ["skinId", "uint"],
-                        42: ["password", "string"],
-                        56: ["authenticationMethod", "uint"],
+                        56: ["authenticationMethod", "string"] // This is the password field!
                     }]
                 },
                 2: {
@@ -928,6 +927,7 @@ const TOURNAMENT_SERVERS = {
         let selectedServer = null;
         let logEntries = [];
         let packetCount = 0;
+        let currentUsername = null;
 
         // ==================== LOGGING SYSTEM ====================
         function addLog(message, type = 'info') {
@@ -1029,6 +1029,20 @@ const TOURNAMENT_SERVERS = {
         }
 
         // ==================== AUTHENTICATION ====================
+        function generateUsername() {
+            const randomNum = Math.floor(Math.random() * 900) + 100;
+            return `Casual ${randomNum}`;
+        }
+
+        function generateUID() {
+            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 32; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
         function sendAuthentication(password) {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 addLog('[ERROR] Cannot authenticate - WebSocket not open', 'error');
@@ -1038,34 +1052,43 @@ const TOURNAMENT_SERVERS = {
             addLog('[AUTH] Sending authentication packet...', 'info');
             
             try {
+                // Generate random username like the game does
+                const username = generateUsername();
+                const uid = generateUID();
+                currentUsername = username;
+                
+                addLog(`[AUTH] Username: ${username}`, 'info');
+                addLog(`[AUTH] UID: ${uid.substring(0, 8)}...`, 'info');
+                
+                // EXACT packet format from the game
                 const authPacket = {
                     8: ["PacketId", "int", 1],
                     18: ["Data", "dict", {
-                        10: ["name", "string", "Analyzer"],
-                        18: ["uid", "string", generateUID()],
-                        24: ["version", "uint", 1],
-                        42: ["password", "string", password],
-                        56: ["authenticationMethod", "uint", 1]
+                        10: ["name", "string", username],
+                        18: ["uid", "string", uid],
+                        32: ["skinId", "uint", 230],  // Default skin
+                        56: ["authenticationMethod", "string", password] // This is where the password goes!
                     }]
                 };
                 
+                // Encode the packet
                 const br = new BR();
                 const encoded = br.encode(authPacket);
+                
+                // Add multiplex header (0x10) - this makes it 26 bytes!
                 const packet = new Uint8Array([10, ...encoded]);
                 
+                addLog(`[AUTH] Sending ${packet.length} byte packet`, 'info');
+                
+                // Log first few bytes for debugging
+                const hexPreview = Array.from(packet.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                addLog(`[AUTH] Packet preview: ${hexPreview}...`, 'info');
+                
                 ws.send(packet);
-                addLog('[AUTH] Authentication packet sent', 'success');
                 
             } catch (e) {
                 addLog(`[ERROR] Authentication failed: ${e.message}`, 'error');
             }
-        }
-
-        function generateUID() {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
         }
 
         // ==================== CONNECTION MANAGEMENT ====================
@@ -1077,8 +1100,8 @@ const TOURNAMENT_SERVERS = {
             
             const password = document.getElementById('serverPassword').value;
             if (!password) {
-                addLog('[ERROR] Password required for tournament servers', 'error');
-                alert('Password is required for tournament servers');
+                addLog('[ERROR] Password required', 'error');
+                alert('Password is required');
                 return;
             }
             
@@ -1106,7 +1129,7 @@ const TOURNAMENT_SERVERS = {
                 const connectionTimeout = setTimeout(() => {
                     if (ws && ws.readyState !== WebSocket.OPEN) {
                         ws.close();
-                        addLog('[ERROR] Connection timeout - Server may be offline', 'error');
+                        addLog('[ERROR] Connection timeout', 'error');
                         showStatus('CONNECTION TIMEOUT', 'status-error');
                     }
                 }, 10000);
@@ -1114,19 +1137,14 @@ const TOURNAMENT_SERVERS = {
                 ws.onopen = () => {
                     clearTimeout(connectionTimeout);
                     addLog(`[CONNECTION] ✅ Connected to ${selectedServer?.displayName}`, 'success');
-                    showStatus(`CONNECTED TO ${selectedServer?.displayName}`, 'status-connected');
+                    showStatus(`CONNECTED`, 'status-connected');
                     
                     document.getElementById('connectBtn').disabled = true;
                     document.getElementById('disconnectBtn').disabled = false;
                     document.getElementById('gameView').style.display = 'block';
                     
-                    // Send authentication immediately
+                    // Send authentication with the password
                     sendAuthentication(password);
-                    
-                    // Send spectator command after auth
-                    if (document.getElementById('autoSpectator').checked) {
-                        setTimeout(sendSpectatorCommand, 1000);
-                    }
                     
                     startRecording();
                 };
@@ -1137,6 +1155,7 @@ const TOURNAMENT_SERVERS = {
                     
                     if (packetCount === 1) {
                         addLog(`[DEBUG] First packet received - ${data.length} bytes`, 'info');
+                        addLog(`[DEBUG] Packet type: ${data[1]} (should be 2 for game state)`, 'info');
                     }
                     
                     const br = new BR();
@@ -1149,6 +1168,16 @@ const TOURNAMENT_SERVERS = {
                     } else if (packets) {
                         handlePacket(packets);
                     }
+                    
+                    // If we get packet 2 (game state), we're authenticated!
+                    if (data[1] === 2 && packetCount === 1) {
+                        addLog('[AUTH] ✅ Authentication successful!', 'success');
+                        
+                        // Send spectator command after successful auth
+                        if (document.getElementById('autoSpectator').checked) {
+                            setTimeout(sendSpectatorCommand, 1000);
+                        }
+                    }
                 };
                 
                 ws.onclose = (event) => {
@@ -1160,15 +1189,11 @@ const TOURNAMENT_SERVERS = {
                     else if (event.code === 1002) reason = 'Protocol error';
                     else if (event.code === 1003) reason = 'Unsupported data';
                     else if (event.code === 1005) reason = 'No status received';
-                    else if (event.code === 1006) reason = 'Abnormal closure - Wrong password or server offline';
-                    else if (event.code === 1007) reason = 'Invalid frame payload';
-                    else if (event.code === 1008) reason = 'Policy violation';
-                    else if (event.code === 1009) reason = 'Message too big';
-                    else if (event.code === 1010) reason = 'Missing extension';
-                    else if (event.code === 1011) reason = 'Internal error';
+                    else if (event.code === 1006) reason = 'Abnormal closure - Wrong password?';
+                    else if (event.code === 1008) reason = 'Policy violation - Wrong password?';
                     
                     addLog(`[CONNECTION] Disconnected - ${reason}`, 'warning');
-                    showStatus(`DISCONNECTED - ${reason}`, 'status-error');
+                    showStatus(`DISCONNECTED`, 'status-error');
                     
                     document.getElementById('connectBtn').disabled = false;
                     document.getElementById('disconnectBtn').disabled = true;
@@ -1178,7 +1203,7 @@ const TOURNAMENT_SERVERS = {
                 ws.onerror = () => {
                     clearTimeout(connectionTimeout);
                     addLog('[ERROR] Connection failed - Check password', 'error');
-                    showStatus('CONNECTION FAILED - WRONG PASSWORD?', 'status-error');
+                    showStatus('CONNECTION FAILED', 'status-error');
                 };
                 
             } catch (error) {
@@ -1203,8 +1228,11 @@ const TOURNAMENT_SERVERS = {
             const data = packet.Data;
             
             switch(packetId) {
-                case 2:
+                case 2: // Game state
+                    addLog('[GAME] Received game state', 'success');
+                    
                     if (data?.players?.list) {
+                        addLog(`[PLAYERS] ${data.players.list.length} players in game`, 'info');
                         data.players.list.forEach(player => updatePlayer(player));
                     }
                     if (data?.gameState) {
@@ -1218,24 +1246,15 @@ const TOURNAMENT_SERVERS = {
                             });
                         }
                     }
-                    if (data?.entities?.list) {
-                        data.entities.list.forEach(entity => {
-                            if (entity?.entity?.entityType === 1) {
-                                ball = entity.entity.position;
-                            } else if (entity?.entity?.playerId) {
-                                entities.set(entity.id, entity.entity.playerId);
-                            }
-                        });
-                    }
                     break;
                     
-                case 7:
+                case 7: // Movement command
                     if (data?.command && data?.EID) {
                         handleBoost(data.EID);
                     }
                     break;
                     
-                case 8:
+                case 8: // Entity update
                     if (data?.entity) {
                         if (data.entity.entityType === 1) {
                             ball = data.entity.position;
@@ -1245,7 +1264,7 @@ const TOURNAMENT_SERVERS = {
                     }
                     break;
                     
-                case 12:
+                case 12: // Game state update
                     if (data?.timeRemaining !== undefined) {
                         gameState.timeRemaining = data.timeRemaining;
                         updateGameTime();
@@ -1588,16 +1607,6 @@ const TOURNAMENT_SERVERS = {
             
             if (currentRecording) {
                 addLog(`[RECORDING] Stopped - Captured ${currentRecording.packets.length} packets`, 'info');
-                
-                const recordings = JSON.parse(localStorage.getItem('tournamentRecordings') || '[]');
-                recordings.push({
-                    id: currentRecording.id,
-                    server: currentRecording.server,
-                    timestamp: new Date().toISOString(),
-                    packetCount: currentRecording.packets.length
-                });
-                localStorage.setItem('tournamentRecordings', JSON.stringify(recordings));
-                
                 currentRecording = null;
             }
             
@@ -1652,9 +1661,10 @@ const TOURNAMENT_SERVERS = {
             
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v3.0 initialized', 'success');
-            addLog('[SYSTEM] Monitoring 8 tournament servers - PASSWORD REQUIRED', 'info');
+            addLog('[SYSTEM] Tournament Anti-Cheat Analyzer v4.0 initialized', 'success');
+            addLog('[SYSTEM] Monitoring 8 tournament servers', 'info');
             addLog('[SYSTEM] Auto-backboost detection active (130ms pattern)', 'info');
+            addLog('[SYSTEM] Default password: rodshot (can be changed in input)', 'info');
         });
 
         window.addEventListener('beforeunload', () => {
