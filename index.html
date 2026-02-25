@@ -1016,18 +1016,20 @@
 
         // ==================== AFK MOVEMENT PACKET ====================
         function createAFKPacket(playerId) {
-            let idBytes = w7bit(playerId);
-            
-            return new Uint8Array([
-                0x08, 0x07, 0x12, 0x0a,
-                0x08, 0x01,
-                0x12, 0x06,
-                0x0d, 0x00, 0x00, 0x00, 0x00,
-                0x15, 0x00, 0x00, 0x00, 0x00,
-                0x18, ...idBytes
-            ]);
-        }
-
+    // This matches the game's actual movement packet structure
+    // From your capture: 0807120a080112060d0000000015000000001808
+    
+    let idBytes = w7bit(playerId);
+    
+    return new Uint8Array([
+        0x08, 0x07, 0x12, 0x0a,  // Packet ID 7, data length 10
+        0x08, 0x01,               // command = true
+        0x12, 0x06,               // position data length 6
+        0x0d, 0x00, 0x00, 0x00, 0x00, // x = 0
+        0x15, 0x00, 0x00, 0x00, 0x00, // z = 0
+        0x18, ...idBytes           // player ID
+    ]);
+}
         // ==================== TOURNAMENT SERVERS CONFIGURATION ====================
         const TOURNAMENT_SERVERS = {
             'ny': {
