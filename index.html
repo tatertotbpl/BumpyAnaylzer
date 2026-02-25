@@ -1059,6 +1059,8 @@
         };
 
         // ==================== GAME STATE ====================
+        let spectatorRetryInterval = null;
+        let spectatorAttempts = 0;
         let ws = null;
         let players = new Map();
         let ball = { x: 0, z: 0 };
@@ -1314,18 +1316,26 @@
             addLog(`[AFK] AFK prevention ${afkEnabled ? 'enabled' : 'disabled'}`, 'info');
         }
 
-        // ==================== TIME MANAGEMENT ====================
-        function startTimeCounter() {
-            if (timeInterval) clearInterval(timeInterval);
-            
-            timeInterval = setInterval(() => {
-                if (gameState.gameState === 3) {
-                    gameState.timeRemaining = Math.max(0, gameState.timeRemaining - 1);
-                    updateGameTime();
-                }
-            }, 1000);
+function startSpectatorRetry() {
+    if (spectatorRetryInterval) return;
+
+    spectatorAttempts = 0;
+
+    spectatorRetryInterval = setInterval(() => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+        if (spectatorSent || spectatorAttempts >= 6) {
+            clearInterval(spectatorRetryInterval);
+            spectatorRetryInterval = null;
+            addLog('[SPECTATOR] Retry finished', 'info');
+            return;
         }
 
+        addLog('[SPECTATOR] Retry attempt...', 'info');
+        sendSpectatorCommand();
+        spectatorAttempts++;
+    }, 1000);
+}
         // ==================== PACKET HANDLING ====================
         function handleGameState(packet) {
             if (!packet.Data) return;
@@ -1398,16 +1408,16 @@
                     }
                 });
             }
-            
-            if (packet.Data.playerId && !playerId) {
-                playerId = packet.Data.playerId;
-                addLog(`[AUTH] Player ID: ${playerId}`, 'success');
-                document.getElementById('spectatorStatus').innerHTML = `✅ ID: ${playerId}`;
-                
-                if (document.getElementById('autoSpectator').checked && !spectatorSent) {
-                    setTimeout(sendSpectatorCommand, 2000);
+
+                            if (packet.Data.playerId && !playerId) {
+                        playerId = packet.Data.playerId;
+                        addLog(`[AUTH] Player ID: ${playerId}`, 'success');
+                        document.getElementById('spectatorStatus').innerHTML = `ID: ${playerId}`;
+
+                        if (document.getElementById('autoSpectator').checked) {
+                        startSpectatorRetry();
+                    }
                 }
-            }
         }
 
         function handleGameStateUpdate(packet) {
@@ -1580,71 +1590,115 @@
                     
                     sendAuthentication(password);
                     startRecording();
-                    startTimeCounter();
                 };
                 
                 ws.onmessage = (event) => {
-                    const data = new Uint8Array(event.data);
-                    packetCount++;
-                    
-                    try {
-                        const br = new BR();
-                        let packets;
-                        
-                        if (data[0] === 10) {
-                            packets = br.Mdecoder(data);
-                        } else {
-                            packets = [br.Sdecoder(data)];
+    const data = new Uint8Array(event.data);
+    packetCount++;
+
+    try {
+        const br = new BR();
+        let packets;
+
+        if (data[0] === 10) {
+            packets = br.Mdecoder(data);
+        } else {
+            packets = [br.Sdecoder(data)];
+        }
+
+        if (!packets) return;
+
+        Object.values(packets).forEach(packet => {
+            if (!packet || !packet.PacketId) return;
+
+            const packetId = packet.PacketId;
+
+            // ================= GAME SNAPSHOT =================
+            if (packetId === 2) {
+                if (!authenticated) {
+                    authenticated = true;
+                    addLog('[AUTH] Authentication successful', 'success');
+                }
+
+                // IMPORTANT: reset entity map after kickoffs/goals
+                if (packet.Data?.entities?.list) {
+                    entityToPlayer.clear();
+                }
+
+                handleGameState(packet);
+            }
+
+            // ================= CONTINUOUS MOVEMENT (FIX) =================
+            else if (packetId === 6) {
+                if (packet.Data?.id && packet.Data?.position) {
+                    const playerId = entityToPlayer.get(packet.Data.id);
+                    if (playerId) {
+                        let player = players.get(playerId);
+                        if (player) {
+                            player.x = packet.Data.position.x;
+                            player.z = packet.Data.position.z;
+                            players.set(playerId, player);
                         }
-                        
-                        if (!packets) return;
-                        
-                        Object.values(packets).forEach(packet => {
-                            if (!packet || !packet.PacketId) return;
-                            
-                            const packetId = packet.PacketId;
-                            
-                            if (packetId === 2) {
-                                if (!authenticated) {
-                                    authenticated = true;
-                                    addLog('[AUTH] ✅ Authentication successful!', 'success');
-                                }
-                                handleGameState(packet);
-                                
-                            } else if (packetId === 7) {
-                                handleMovement(packet);
-                                
-                            } else if (packetId === 8) {
-                                if (packet.Data?.entity?.playerId && packet.Data?.entity?.position) {
-                                    let player = players.get(packet.Data.entity.playerId);
-                                    if (player) {
-                                        player.x = packet.Data.entity.position.x;
-                                        player.z = packet.Data.entity.position.z;
-                                        players.set(packet.Data.entity.playerId, player);
-                                    }
-                                }
-                                
-                            } else if (packetId === 12) {
-                                handleGameStateUpdate(packet);
-                                
-                            } else if (packetId === 13) {
-                                handleTeamChange(packet);
-                            }
-                        });
-                        
-                        if (currentRecording) {
-                            currentRecording.packets.push({
-                                timestamp: Date.now() - recordingStartTime,
-                                packetId: packet.PacketId,
-                                gameState: { ...gameState }
-                            });
-                        }
-                        
-                        drawCanvas();
-                        updatePlayerList();
-                        
-                    } catch (e) {}
-                };
+                    }
+                }
+            }
+
+            // Boost detection movement
+            else if (packetId === 7) {
+                handleMovement(packet);
+            }
+
+            // Entity spawn/update
+            else if (packetId === 8) {
+                if (packet.Data?.entity?.playerId && packet.Data?.entity?.position) {
+                    let player = players.get(packet.Data.entity.playerId);
+                    if (player) {
+                        player.x = packet.Data.entity.position.x;
+                        player.z = packet.Data.entity.position.z;
+                        players.set(packet.Data.entity.playerId, player);
+                    }
+                }
+            }
+
+            // ================= GAME STATE LIVE SYNC (FIX) =================
+            else if (packetId === 12) {
+                if (packet.Data.timeRemaining !== undefined) {
+                    gameState.timeRemaining = Math.floor(packet.Data.timeRemaining);
+                    gameState.gameState = packet.Data.gameState ?? gameState.gameState;
+                    updateGameTime();
+                    document.getElementById('gameState').innerText = gameState.gameState;
+                }
+
+                if (packet.Data.teams) {
+                    packet.Data.teams.forEach(team => {
+                        if (team.teamId === 0) gameState.redScore = team.score;
+                        if (team.teamId === 1) gameState.blueScore = team.score;
+                    });
+                    updateScores();
+                }
+            }
+
+            else if (packetId === 13) {
+                handleTeamChange(packet);
+            }
+
+        });
+
+        // Recording
+        if (currentRecording) {
+            currentRecording.packets.push({
+                timestamp: Date.now() - recordingStartTime,
+                gameState: { ...gameState }
+            });
+        }
+
+        drawCanvas();
+        updatePlayerList();
+
+    } catch (e) {
+        addLog('[ERROR] Packet decode error', 'error');
+    }
+};
                 
                 ws.onclose = (event) => {
                     clearTimeout(connectionTimeout);
