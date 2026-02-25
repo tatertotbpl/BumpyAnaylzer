@@ -1246,55 +1246,43 @@
 
         // ==================== SPECTATOR MODE ====================
         function sendSpectatorCommand() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
-                return;
-            }
-            
-            if (!playerId) {
-                addLog('[ERROR] No player ID yet - waiting for game state', 'error');
-                document.getElementById('spectatorStatus').innerHTML = '⚠️ WAITING FOR ID';
-                return;
-            }
-            
-            if (spectatorSent) {
-                addLog('[SPECTATOR] Already sent spectator command', 'info');
-                return;
-            }
-            
-            addLog(`[SPECTATOR] Switching player ${playerId} to spectator mode...`, 'info');
-            document.getElementById('spectatorStatus').innerHTML = 'SWITCHING...';
-            
-            try {
-                // Try team change packet first
-                const packet = createTeamChangePacket(playerId, 2);
-                
-                const hexPacket = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                addLog(`[SPECTATOR] Sending team change packet: ${hexPacket}`, 'info');
-                
-                ws.send(packet);
-                
-                spectatorSent = true;
-                addLog('[SPECTATOR] ✅ Team change to spectator sent', 'success');
-                document.getElementById('spectatorStatus').innerHTML = '✅ SPECTATOR MODE';
-                
-                // Start AFK prevention after switching
-                setTimeout(() => startAFKPrevention(), 2000);
-                
-            } catch (e) {
-                addLog(`[ERROR] Failed to send spectator command: ${e.message}`, 'error');
-                document.getElementById('spectatorStatus').innerHTML = '❌ FAILED';
-            }
-        }
-
-        function manualSpectator() {
-            if (!playerId) {
-                addLog('[MANUAL] Cannot send spectator - No player ID yet', 'warning');
-                return;
-            }
-            addLog('[MANUAL] Manual spectator command triggered', 'info');
-            sendSpectatorCommand();
-        }
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
+        return;
+    }
+    
+    if (!playerId) {
+        addLog('[ERROR] No player ID yet', 'error');
+        return;
+    }
+    
+    if (spectatorSent) {
+        addLog('[SPECTATOR] Already sent', 'info');
+        return;
+    }
+    
+    addLog(`[SPECTATOR] Sending /team spectator as chat command...`, 'info');
+    document.getElementById('spectatorStatus').innerHTML = 'TYPING...';
+    
+    try {
+        // Use chat command instead of team change packet
+        const packet = createChatCommand(playerId, "/team spectator");
+        
+        const hexPacket = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
+        addLog(`[SPECTATOR] Sending chat packet: ${hexPacket}`, 'info');
+        
+        ws.send(packet);
+        spectatorSent = true;
+        
+        document.getElementById('spectatorStatus').innerHTML = '✅ COMMAND SENT';
+        
+        // Start AFK prevention after sending command
+        setTimeout(() => startAFKPrevention(), 2000);
+        
+    } catch (e) {
+        addLog(`[ERROR] Failed: ${e.message}`, 'error');
+    }
+}
 
         // ==================== AFK PREVENTION ====================
         function startAFKPrevention() {
