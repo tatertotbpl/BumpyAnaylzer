@@ -3,1310 +3,1162 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Analyze Bumpy match replays with heatmaps, player stats, and goal tracking">
-  <meta name="theme-color" content="#0d0d1a">
-  <title>Bumpy Match Analyzer</title>
+  <title>DUCK ANALYZER - Live Tournament Monitor</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
+    
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
       background: linear-gradient(145deg, #0d0d1a 0%, #1a1a2e 100%);
       color: #e0e0e0;
       min-height: 100vh;
     }
-
+    
     .header {
-      background: linear-gradient(90deg, rgba(0, 212, 255, 0.15) 0%, rgba(255, 68, 102, 0.15) 100%);
+      background: linear-gradient(90deg, rgba(0,212,255,0.15) 0%, rgba(255,68,102,0.15) 100%);
       padding: 20px 30px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-
+    
     .logo {
       font-size: 24px;
       font-weight: 600;
     }
     .logo .duck { color: #00d4ff; }
     .logo .mod { color: #888; font-weight: 300; margin-left: 8px; }
-
-    .drop-zone {
-      border: 2px dashed rgba(0, 212, 255, 0.4);
-      border-radius: 12px;
-      padding: 60px;
-      text-align: center;
-      margin: 30px;
-      transition: all 0.3s ease;
-      cursor: pointer;
-    }
-    .drop-zone:hover, .drop-zone.dragover {
-      border-color: #00d4ff;
-      background: rgba(0, 212, 255, 0.05);
-    }
-    .drop-zone h2 { color: #00d4ff; margin-bottom: 10px; }
-    .drop-zone p { color: #666; }
-
-    .hidden { display: none !important; }
-
-    .dashboard {
+    
+    .main-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 350px 1fr;
       gap: 20px;
       padding: 20px 30px;
     }
-
-    @media (max-width: 1200px) {
-      .dashboard { grid-template-columns: 1fr; }
+    
+    @media (max-width: 1000px) {
+      .main-grid { grid-template-columns: 1fr; }
     }
-
-    .card {
+    
+    /* Server Panel */
+    .server-panel {
       background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
-      border: 1px solid rgba(0, 212, 255, 0.2);
+      border: 1px solid rgba(0,212,255,0.2);
       border-radius: 12px;
       overflow: hidden;
     }
-
-    .card-header {
-      background: rgba(0, 212, 255, 0.1);
+    
+    .panel-header {
+      background: rgba(0,212,255,0.1);
       padding: 12px 16px;
       font-weight: 600;
       font-size: 14px;
       text-transform: uppercase;
       letter-spacing: 1px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .card-content { padding: 16px; }
-
-    .match-info {
+      border-bottom: 1px solid rgba(255,255,255,0.1);
       display: flex;
-      gap: 30px;
-      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
     }
-    .match-info .stat {
-      text-align: center;
+    
+    .panel-content { padding: 16px; }
+    
+    .server-group {
+      margin-bottom: 20px;
     }
-    .match-info .stat-value {
-      font-size: 28px;
-      font-weight: 600;
+    
+    .group-title {
       color: #00d4ff;
-    }
-    .match-info .stat-label {
-      font-size: 11px;
-      color: #666;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 10px;
       text-transform: uppercase;
     }
-
+    
+    .server-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(0,212,255,0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .server-card:hover {
+      background: rgba(0,212,255,0.1);
+      border-color: #00d4ff;
+    }
+    .server-card.selected {
+      background: rgba(0,212,255,0.15);
+      border-color: #00d4ff;
+      box-shadow: 0 0 15px rgba(0,212,255,0.3);
+    }
+    .server-card .name { font-weight: 600; }
+    .server-card .status {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 10px #4ade80;
+    }
+    .server-card .status.offline { background: #ff4466; box-shadow: 0 0 10px #ff4466; }
+    
+    .password-input {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(0,212,255,0.3);
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: #fff;
+      margin: 10px 0;
+    }
+    
+    .connect-btn {
+      width: 100%;
+      background: linear-gradient(145deg, #00d4ff 0%, #00a0cc 100%);
+      border: none;
+      color: #000;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      margin: 5px 0;
+    }
+    .connect-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 15px;
+      padding: 10px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 6px;
+    }
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .status-dot.connected { background: #4ade80; box-shadow: 0 0 10px #4ade80; }
+    .status-dot.connecting { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
+    .status-dot.disconnected { background: #ff4466; box-shadow: 0 0 10px #ff4466; }
+    
+    /* Live View Panel */
+    .live-panel {
+      background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
     .field-container {
       position: relative;
       width: 100%;
       aspect-ratio: 45/65;
-      max-width: 400px;
+      max-width: 500px;
       margin: 0 auto;
+      background: #0a0a12;
     }
-
-    #heatmapCanvas, #replayCanvas {
+    
+    #liveCanvas {
       width: 100%;
       height: 100%;
-      border-radius: 8px;
+      display: block;
     }
-
-    .heatmap-controls {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 15px;
-      flex-wrap: wrap;
-    }
-
-    .heatmap-btn {
-      background: linear-gradient(145deg, #333 0%, #222 100%);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #888;
-      padding: 8px 16px;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: all 0.2s ease;
-    }
-    .heatmap-btn:hover { background: linear-gradient(145deg, #444 0%, #333 100%); }
-    .heatmap-btn.active {
-      background: linear-gradient(145deg, #00d4ff 0%, #00a0cc 100%);
-      color: #000;
-      border-color: #00d4ff;
-    }
-    .heatmap-btn.red.active {
-      background: linear-gradient(145deg, #ff4466 0%, #cc3355 100%);
-      border-color: #ff4466;
-    }
-
-    .player-stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 12px;
-    }
-
-    .player-card {
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 8px;
-      padding: 12px;
-      border-left: 3px solid;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .player-card:hover { background: rgba(255, 255, 255, 0.08); }
-    .player-card.blue { border-color: #00d4ff; }
-    .player-card.red { border-color: #ff4466; }
-    .player-card.selected { background: rgba(255, 255, 255, 0.15); }
-    .player-card.selected.blue { box-shadow: 0 0 10px rgba(0, 212, 255, 0.3); }
-    .player-card.selected.red { box-shadow: 0 0 10px rgba(255, 68, 102, 0.3); }
-
-    .team-section { margin-bottom: 20px; }
-    .team-header {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 10px;
-      padding: 8px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: inline-block;
-    }
-    .team-header:hover { opacity: 0.8; }
-    .team-header.blue { color: #000; background: linear-gradient(90deg, #00d4ff, #00a0cc); }
-    .team-header.red { color: #fff; background: linear-gradient(90deg, #ff4466, #cc3355); }
-
-    .player-name {
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-    .player-card.blue .player-name { color: #00d4ff; }
-    .player-card.red .player-name { color: #ff4466; }
-
-    .player-stat-row {
+    
+    .stats-row {
       display: flex;
       justify-content: space-between;
-      font-size: 12px;
-      padding: 2px 0;
-      color: #888;
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
     }
-    .player-stat-row span:last-child { color: #fff; }
-
-    .possession-bar {
-      display: flex;
-      height: 30px;
-      border-radius: 6px;
-      overflow: hidden;
-      margin-top: 10px;
+    
+    .player-list {
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 10px 16px;
     }
-    .possession-bar .blue {
-      background: linear-gradient(90deg, #00d4ff, #00a0cc);
+    
+    .player-item {
       display: flex;
       align-items: center;
-      justify-content: center;
-      font-weight: 600;
+      padding: 4px 0;
+    }
+    .player-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .player-dot.blue { background: #00d4ff; box-shadow: 0 0 10px #00d4ff; }
+    .player-dot.red { background: #ff4466; box-shadow: 0 0 10px #ff4466; }
+    .player-name { flex: 1; }
+    .player-position { color: #888; font-size: 11px; }
+    
+    .tabs {
+      display: flex;
+      gap: 2px;
+      background: rgba(0,0,0,0.3);
+      padding: 4px;
+      border-radius: 8px;
+      margin: 10px 16px;
+    }
+    .tab {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .tab.active {
+      background: #00d4ff;
       color: #000;
     }
-    .possession-bar .red {
-      background: linear-gradient(90deg, #cc3355, #ff4466);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      color: #fff;
+    
+    .saved-games {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      padding: 16px;
     }
-
-    .replay-controls {
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      margin-top: 30px;
-      padding-top: 10px;
+    
+    .game-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(0,212,255,0.1);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
     }
-
-    .play-btn {
+    .game-card:hover { border-color: #00d4ff; }
+    .game-date { font-size: 11px; color: #888; }
+    .game-score {
+      display: flex;
+      justify-content: space-between;
+      font-size: 18px;
+      margin: 8px 0;
+    }
+    
+    .btn {
       background: linear-gradient(145deg, #00d4ff 0%, #00a0cc 100%);
       border: none;
       color: #000;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
+      padding: 8px 16px;
+      border-radius: 6px;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-    }
-
-    .timeline {
-      flex: 1;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 3px;
-      cursor: pointer;
-      position: relative;
-    }
-    .timeline-progress {
-      height: 100%;
-      background: linear-gradient(90deg, #00d4ff, #ff4466);
-      border-radius: 3px;
-      width: 0%;
-    }
-    .timeline-thumb {
-      position: absolute;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: 14px;
-      height: 14px;
-      background: #fff;
-      border-radius: 50%;
-      left: 0%;
-    }
-    .goal-marker {
-      position: absolute;
-      top: -8px;
-      transform: translateX(-50%);
-      width: 3px;
-      height: 22px;
-      border-radius: 2px;
-    }
-    .goal-marker.blue { background: #00d4ff; }
-    .goal-marker.red { background: #ff4466; }
-    .goal-marker::after {
-      content: '⚽';
-      position: absolute;
-      top: -14px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 10px;
-    }
-
-    .time-display {
-      font-family: monospace;
-      font-size: 14px;
-      min-width: 80px;
-      text-align: right;
-    }
-
-    .speed-control {
-      display: flex;
-      align-items: center;
-      gap: 5px;
       font-size: 12px;
-      color: #666;
     }
-    .speed-control select {
-      background: #222;
-      border: 1px solid #444;
-      color: #fff;
-      padding: 4px 8px;
-      border-radius: 4px;
-    }
-
-    .full-width { grid-column: 1 / -1; }
-
-    .heatmap-legend {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 15px;
-    }
-    .legend-gradient {
-      width: 200px;
-      height: 16px;
-      border-radius: 4px;
-      background: linear-gradient(to right,
-        rgba(0, 0, 0, 0.7),
-        rgba(139, 0, 0, 0.85),
-        rgba(255, 69, 0, 0.9),
-        rgba(255, 165, 0, 0.95),
-        rgba(255, 255, 0, 1),
-        rgba(255, 255, 255, 1)
-      );
-      border: 1px solid rgba(255, 255, 255, 0.3);
-    }
-    .legend-label {
-      font-size: 11px;
-      color: #888;
-      text-transform: uppercase;
-    }
+    .btn.small { padding: 4px 8px; }
+    
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="logo">
-      <span class="duck">BUMPY</span>
+      <span class="duck">DUCK</span>
       <span class="mod">ANALYZER</span>
     </div>
-    <div style="display: flex; align-items: center; gap: 20px;">
-      <div id="matchTitle" style="color: #666;"></div>
-      <button id="loadNewFile" class="heatmap-btn hidden" style="padding: 8px 16px;">Load New File</button>
+    <div>
+      <button class="btn small" id="showSavedBtn">📁 Saved Games</button>
+      <button class="btn small" id="clearSavedBtn">🗑 Clear</button>
     </div>
   </div>
-
-  <div id="dropZone" class="drop-zone">
-    <h2>Drop Match JSON Here</h2>
-    <p>or click to select file</p>
-    <input type="file" id="fileInput" accept=".json" style="display: none;">
-  </div>
-
-  <div id="dashboard" class="dashboard hidden">
-    <!-- Match Overview -->
-    <div class="card">
-      <div class="card-header">Match Overview</div>
-      <div class="card-content">
-        <div class="match-info" id="matchInfo"></div>
-        <div id="scoreContainer" style="margin-top: 20px;">
-          <div style="font-size: 12px; color: #666; margin-bottom: 5px;">SCORE</div>
-          <div id="scoreDisplay" style="display: flex; align-items: center; justify-content: center; gap: 20px; font-size: 32px; font-weight: bold;">
-            <span style="color: #00d4ff;" id="blueScore">0</span>
-            <span style="color: #666;">-</span>
-            <span style="color: #ff4466;" id="redScore">0</span>
-          </div>
-          <div id="goalsList" style="margin-top: 10px; font-size: 12px;"></div>
+  
+  <div class="main-grid">
+    <!-- LEFT PANEL - Server Selection -->
+    <div class="server-panel">
+      <div class="panel-header">
+        <span>🔌 TOURNAMENT SERVERS</span>
+        <span id="connectionStatus" class="status-dot disconnected"></span>
+      </div>
+      <div class="panel-content">
+        <div class="server-group">
+          <div class="group-title">🇺🇸 NEW YORK</div>
+          <div id="ny-servers"></div>
         </div>
-        <div id="possessionContainer" style="margin-top: 20px;">
-          <div style="font-size: 12px; color: #666; margin-bottom: 5px;">POSSESSION</div>
-          <div class="possession-bar" id="possessionBar"></div>
+        
+        <div class="server-group">
+          <div class="group-title">🇩🇪 FRANKFURT</div>
+          <div id="fra-servers"></div>
+        </div>
+        
+        <input type="password" id="passwordInput" class="password-input" placeholder="Server password" value="rodshot">
+        
+        <button class="connect-btn" id="connectBtn" disabled>🚀 CONNECT TO SERVER</button>
+        <button class="connect-btn" id="disconnectBtn" style="background: #ff4466; color: white;" disabled>🔌 DISCONNECT</button>
+        
+        <div class="status-indicator">
+          <span id="statusDot" class="status-dot disconnected"></span>
+          <span id="statusText">Not connected</span>
+        </div>
+        
+        <div style="margin-top: 15px;">
+          <div class="tabs">
+            <div class="tab active" data-tab="live">LIVE</div>
+            <div class="tab" data-tab="players">PLAYERS</div>
+            <div class="tab" data-tab="saved">SAVED</div>
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- Heatmap -->
-    <div class="card">
-      <div class="card-header">Position Heatmap</div>
-      <div class="card-content">
-        <div class="heatmap-controls">
-          <button class="heatmap-btn active" id="heatmapPlayers">Players</button>
-          <button class="heatmap-btn" id="heatmapBall">Ball</button>
-        </div>
+    
+    <!-- RIGHT PANEL - Live View -->
+    <div class="live-panel">
+      <div class="panel-header">
+        <span>📺 LIVE SPECTATOR</span>
+        <span id="matchTime">0:00</span>
+      </div>
+      
+      <!-- LIVE TAB -->
+      <div id="liveTab" class="tab-pane">
         <div class="field-container">
-          <canvas id="heatmapCanvas" width="450" height="650"></canvas>
+          <canvas id="liveCanvas" width="450" height="650"></canvas>
         </div>
-        <div class="heatmap-legend">
-          <span class="legend-label">Low</span>
-          <div class="legend-gradient"></div>
-          <span class="legend-label">High</span>
+        
+        <div class="stats-row">
+          <span>Players: <span id="playerCount">0</span></span>
+          <span>My ID: <span id="myId">-</span></span>
+        </div>
+        
+        <div class="player-list" id="playerList"></div>
+      </div>
+      
+      <!-- PLAYERS TAB -->
+      <div id="playersTab" class="tab-pane hidden">
+        <div style="padding: 16px;">
+          <div style="margin-bottom: 10px;">
+            <button class="btn small" id="manualSpectatorBtn">👁️ Go Spectator</button>
+            <button class="btn small" id="startRecordBtn">⏺ Record</button>
+          </div>
+          <div id="detailedPlayerList"></div>
         </div>
       </div>
-    </div>
-
-    <!-- Player Stats -->
-    <div class="card full-width">
-      <div class="card-header">Player Statistics <span style="font-weight: 300; font-size: 11px; color: #666;">(click players to filter heatmap)</span></div>
-      <div class="card-content">
-        <div style="margin-bottom: 15px;">
-          <button class="heatmap-btn" id="selectAllPlayers" style="margin-right: 5px;">Select All</button>
-          <button class="heatmap-btn" id="deselectAllPlayers">Deselect All</button>
-        </div>
-        <div id="playerStats"></div>
-      </div>
-    </div>
-
-    <!-- Match Replay -->
-    <div class="card full-width">
-      <div class="card-header">Match Replay</div>
-      <div class="card-content">
-        <div class="field-container" style="max-width: 500px;">
-          <canvas id="replayCanvas" width="450" height="650"></canvas>
-        </div>
-        <div id="goalAlert" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px 60px; border-radius: 12px; text-align: center; z-index: 1000; border: 2px solid;">
-          <div style="font-size: 48px; font-weight: bold;">GOAL!</div>
-          <div id="goalScorer" style="font-size: 24px; margin-top: 10px;"></div>
-        </div>
-        <div class="replay-controls">
-          <button class="play-btn" id="playBtn">▶</button>
-          <div class="timeline" id="timeline">
-            <div class="timeline-progress" id="timelineProgress"></div>
-            <div class="timeline-thumb" id="timelineThumb"></div>
-            <div id="goalMarkers"></div>
-          </div>
-          <div class="time-display" id="timeDisplay">0:00 / 0:00</div>
-          <div class="speed-control">
-            <span>Speed:</span>
-            <select id="speedSelect">
-              <option value="0.5">0.5x</option>
-              <option value="1" selected>1x</option>
-              <option value="2">2x</option>
-              <option value="4">4x</option>
-            </select>
-          </div>
+      
+      <!-- SAVED TAB -->
+      <div id="savedTab" class="tab-pane hidden">
+        <div style="padding: 16px;">
+          <div id="savedGamesList" class="saved-games"></div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    // Field dimensions (matching the game)
+    // ==================== CONSTANTS ====================
     const FIELD = {
       minX: -15, maxX: 30,
       minZ: -25, maxZ: 40,
-      centerX: 7.5, centerZ: 7.5,
-      goalLeftX: 3.3, goalRightX: 11.7,
+      centerX: 7.5, centerZ: 7.5
     };
-
-    let matchData = null;
-    let playerAnalysis = {};
-    let heatmapMode = 'players'; // 'players' or 'ball'
-    let selectedPlayers = new Set();
-    let isPlaying = false;
-    let currentSampleIndex = 0;
-    let playbackSpeed = 1;
-    let animationFrame = null;
-    let lastFrameTime = 0;
-
-    // Preload images
-    const pitchImage = new Image();
-    pitchImage.src = 'BumpyPitch.jpg';
-    const blueCarImage = new Image();
-    blueCarImage.src = 'top_blauweauto.png';
-    const redCarImage = new Image();
-    redCarImage.src = 'top_rodeauto.png';
-    let imagesLoaded = 0;
-    const totalImages = 3;
-
-    function onImageLoad() {
-      imagesLoaded++;
-      if (imagesLoaded === totalImages && matchData) {
-        renderHeatmap();
-        renderReplayFrame();
+    
+    const SERVERS = {
+      ny: [
+        { name: 'NY-8086', url: 'wss://community-01.usemapsettings.com:8086/server', password: 'rodshot' },
+        { name: 'NY-8087', url: 'wss://community-01.usemapsettings.com:8087/server', password: 'rodshot' },
+        { name: 'NY-8088', url: 'wss://community-01.usemapsettings.com:8088/server', password: 'rodshot' },
+        { name: 'NY-8089', url: 'wss://community-01.usemapsettings.com:8089/server', password: 'rodshot' }
+      ],
+      fra: [
+        { name: 'FRA-8086', url: 'wss://community-02.usemapsettings.com:8086/server', password: 'rodshot' },
+        { name: 'FRA-8087', url: 'wss://community-02.usemapsettings.com:8087/server', password: 'rodshot' },
+        { name: 'FRA-8088', url: 'wss://community-02.usemapsettings.com:8088/server', password: 'rodshot' },
+        { name: 'FRA-8089', url: 'wss://community-02.usemapsettings.com:8089/server', password: 'rodshot' }
+      ]
+    };
+    
+    // ==================== STATE ====================
+    let ws = null;
+    let selectedServer = null;
+    let playerId = null;
+    let myName = null;
+    
+    const state = {
+      players: {},
+      entityMap: {},
+      positions: {},
+      ballEntityId: null,
+      matchTime: 0,
+      recording: false,
+      matchData: { startTime: null, samples: [], goals: [] }
+    };
+    
+    let afkInterval = null;
+    let recordingInterval = null;
+    
+    // ==================== VARINT FUNCTIONS ====================
+    const w7bit = num => {
+      let r = [];
+      while (num >= 128) {
+        r.push((128 | num) % 256);
+        num >>= 7;
       }
-    }
-    pitchImage.onload = onImageLoad;
-    blueCarImage.onload = onImageLoad;
-    redCarImage.onload = onImageLoad;
-
-    // File handling
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const dashboard = document.getElementById('dashboard');
-
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.classList.add('dragover');
-    });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('dragover');
-      if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
-    });
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files.length) loadFile(e.target.files[0]);
-    });
-
-    document.getElementById('loadNewFile').addEventListener('click', () => {
-      // Stop any playing replay
-      if (isPlaying) togglePlayback();
-      // Reset and show drop zone
-      dropZone.classList.remove('hidden');
-      dropZone.innerHTML = `
-        <h2>Drop Match JSON Here</h2>
-        <p>or click to select file</p>
-        <input type="file" id="fileInput" accept=".json" style="display: none;">
-      `;
-      document.getElementById('fileInput').addEventListener('change', (e) => {
-        if (e.target.files.length) loadFile(e.target.files[0]);
-      });
-      dropZone.onclick = () => document.getElementById('fileInput').click();
-      dashboard.classList.add('hidden');
-      document.getElementById('loadNewFile').classList.add('hidden');
-    });
-
-    function showError(message) {
-      const dropZone = document.getElementById('dropZone');
-      dropZone.classList.remove('hidden');
-      dropZone.innerHTML = `
-        <h2 style="color: #ff4466;">Error Loading File</h2>
-        <p style="color: #ff6680; margin: 10px 0;">${message}</p>
-        <p style="color: #666; margin-top: 20px;">Drop another file or click to try again</p>
-        <input type="file" id="fileInput" accept=".json" style="display: none;">
-      `;
-      document.getElementById('fileInput').addEventListener('change', (e) => {
-        if (e.target.files.length) loadFile(e.target.files[0]);
-      });
-      dashboard.classList.add('hidden');
-    }
-
-    function loadFile(file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          matchData = JSON.parse(e.target.result);
-
-          // Validate required fields
-          if (!matchData.samples) matchData.samples = [];
-          if (!matchData.players) matchData.players = {};
-          if (!matchData.duration) matchData.duration = 0;
-          if (!matchData.recorded) matchData.recorded = new Date().toISOString();
-
-          analyzeMatch();
-          currentSampleIndex = 0;
-          lastGoalIndex = -1;
-          selectedPlayers = new Set(Object.keys(playerAnalysis));
-          showDashboard();
-        } catch (err) {
-          showError('Invalid JSON format: ' + err.message);
-        }
-      };
-      reader.onerror = () => showError('Could not read file');
-      reader.readAsText(file);
-    }
-
-    function analyzeMatch() {
-      playerAnalysis = {};
-      let bluePossession = 0;
-      let redPossession = 0;
-
-      if (!matchData.samples || !Array.isArray(matchData.samples)) {
-        matchData.samples = [];
+      r.push(num % 256);
+      return r;
+    };
+    
+    const readVarInt = (arr, start) => {
+      let result = 0, shift = 0, pos = start;
+      while (pos < arr.length && shift < 35) {
+        const byte = arr[pos++];
+        result |= (byte & 0x7f) << shift;
+        if ((byte & 0x80) === 0) break;
+        shift += 7;
       }
-
-      for (const sample of matchData.samples) {
-        if (!sample.players || !Array.isArray(sample.players)) {
-          sample.players = [];
-        }
-        // Possession calculation
-        if (sample.ball && sample.players.length > 0) {
-          let closestBlue = Infinity, closestRed = Infinity;
-          for (const p of sample.players) {
-            if (p.distToBall !== null) {
-              if (p.team === 'blue' && p.distToBall < closestBlue) closestBlue = p.distToBall;
-              if (p.team === 'red' && p.distToBall < closestRed) closestRed = p.distToBall;
+      return [result, pos];
+    };
+    
+    const readFloat32 = (arr, start) => {
+      if (start + 4 > arr.length) return [0, start + 4];
+      const buffer = new Uint8Array(arr.slice(start, start + 4)).buffer;
+      return [new Float32Array(buffer)[0], start + 4];
+    };
+    
+    const readString = (arr, start) => {
+      const [len, dataStart] = readVarInt(arr, start);
+      if (len <= 0 || len > 50 || dataStart + len > arr.length) return ["", start];
+      try {
+        const str = new TextDecoder().decode(new Uint8Array(arr.slice(dataStart, dataStart + len)));
+        return [str, dataStart + len];
+      } catch { return ["", start]; }
+    };
+    
+    // ==================== PACKET BUILDERS ====================
+    function createAuthPacket(username, uid, password) {
+      const usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
+      const uidBytes = Array.from(uid).map(c => c.charCodeAt(0));
+      const pwdBytes = Array.from(password).map(c => c.charCodeAt(0));
+      const teamBytes = w7bit(2); // spectator
+      
+      const dataBytes = [
+        0x0a, usernameBytes.length, ...usernameBytes,
+        0x12, uidBytes.length, ...uidBytes,
+        0x18, 0xe6, 0x06,
+        0x20, ...teamBytes,
+        0x2a, pwdBytes.length, ...pwdBytes,
+        0x38, 0x01
+      ];
+      
+      const header = [0x08, 0x01, 0x12, dataBytes.length];
+      return new Uint8Array([...header, ...dataBytes]);
+    }
+    
+    function createAFKPacket(playerId) {
+      const idBytes = w7bit(playerId);
+      return new Uint8Array([
+        0x08, 0x07, 0x12, 0x0a,
+        0x08, 0x01,
+        0x12, 0x06,
+        0x0d, 0x00, 0x00, 0x00, 0x00,
+        0x15, 0x00, 0x00, 0x00, 0x00,
+        0x18, ...idBytes
+      ]);
+    }
+    
+    function createSpectatorPacket(playerId) {
+      const msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
+      const idBytes = w7bit(playerId);
+      
+      const innerPacket = [
+        0x08, 0x05, 0x12, 0x0c,
+        0x08, ...idBytes,
+        0x12, msgBytes.length, ...msgBytes
+      ];
+      
+      const lenBytes = w7bit(innerPacket.length);
+      return new Uint8Array([0x0a, ...lenBytes, ...innerPacket]);
+    }
+    
+    // ==================== PACKET PARSING ====================
+    function parseMessage(data) {
+      if (data.length < 5 || data[0] !== 10) return;
+      
+      const [, afterLen] = readVarInt(data, 1);
+      if (data[afterLen] !== 8) return;
+      
+      const [code] = readVarInt(data, afterLen + 1);
+      
+      switch (code) {
+        case 2: case 3: case 8: case 13: case 15:
+          parsePlayerList(data);
+          parseEntityMappings(data);
+          break;
+        case 6:
+          parsePositions(data);
+          break;
+        case 11:
+          parseGoal(data);
+          break;
+        case 12:
+          parseGameState(data);
+          break;
+      }
+      
+      updateLiveView();
+    }
+    
+    function parsePlayerList(arr) {
+      let currentId = null, currentName = null, currentTeam = 0;
+      
+      for (let i = 0; i < arr.length - 2; i++) {
+        if (arr[i] === 8) {
+          const [val, nextPos] = readVarInt(arr, i + 1);
+          if (val >= 100 && val < 15000) {
+            // Check if this is a player (has name nearby)
+            for (let j = nextPos; j < Math.min(nextPos + 5, arr.length); j++) {
+              if (arr[j] === 18) {
+                const [strLen] = readVarInt(arr, j + 1);
+                if (strLen >= 2 && strLen <= 20) {
+                  if (currentId !== null && currentName !== null) {
+                    state.players[currentId] = { name: currentName, team: currentTeam };
+                  }
+                  currentId = val;
+                  currentName = null;
+                  currentTeam = 0;
+                  break;
+                }
+              }
             }
           }
-          if (closestBlue < closestRed) bluePossession++;
-          else if (closestRed < closestBlue) redPossession++;
         }
-
-        // Player stats
-        for (const p of sample.players) {
-          if (!playerAnalysis[p.name]) {
-            playerAnalysis[p.name] = {
-              team: p.team,
-              positions: [],
-              speeds: [],
-              distanceSum: 0,
-              lastPos: null,
-              offensiveTime: 0,
-              defensiveTime: 0,
-            };
-          }
-          const pa = playerAnalysis[p.name];
-          pa.positions.push({ x: p.x, z: p.z });
-
-          const speed = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
-          pa.speeds.push(speed);
-
-          if (pa.lastPos) {
-            pa.distanceSum += Math.sqrt((p.x - pa.lastPos.x) ** 2 + (p.z - pa.lastPos.z) ** 2);
-          }
-          pa.lastPos = { x: p.x, z: p.z };
-
-          // Offensive/defensive based on field half
-          // Blue goal is at low Z (bottom), Red goal is at high Z (top)
-          // Blue attacks toward high Z, Red attacks toward low Z
-          const midZ = FIELD.centerZ;
-          if (p.team === 'blue') {
-            if (p.z > midZ) pa.offensiveTime++;  // Blue in red's half = offensive
-            else pa.defensiveTime++;
-          } else {
-            if (p.z < midZ) pa.offensiveTime++;  // Red in blue's half = offensive
-            else pa.defensiveTime++;
+        
+        if (arr[i] === 18 && currentId !== null && currentName === null) {
+          const [str] = readString(arr, i + 1);
+          if (str.length >= 2 && str.length <= 20 && !/^[a-f0-9]{8}-/i.test(str)) {
+            currentName = str;
+            // Check if this is us
+            if (!myName) {
+              myName = str;
+              playerId = currentId;
+              document.getElementById('myId').textContent = playerId;
+            }
           }
         }
-      }
-
-      // Store possession
-      const totalPossession = bluePossession + redPossession;
-      matchData.possession = {
-        blue: totalPossession > 0 ? (bluePossession / totalPossession * 100) : 50,
-        red: totalPossession > 0 ? (redPossession / totalPossession * 100) : 50,
-      };
-    }
-
-    function showDashboard() {
-      dropZone.classList.add('hidden');
-      dashboard.classList.remove('hidden');
-      document.getElementById('loadNewFile').classList.remove('hidden');
-
-      // Match title
-      document.getElementById('matchTitle').textContent =
-        `Recorded: ${new Date(matchData.recorded).toLocaleString()}`;
-
-      // Match info
-      const duration = Math.floor(matchData.duration / 1000);
-      const mins = Math.floor(duration / 60);
-      const secs = duration % 60;
-      const playerCount = Object.keys(matchData.players).length;
-      const sampleCount = matchData.samples.length;
-
-      document.getElementById('matchInfo').innerHTML = `
-        <div class="stat">
-          <div class="stat-value">${mins}:${secs.toString().padStart(2, '0')}</div>
-          <div class="stat-label">Duration</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value">${playerCount}</div>
-          <div class="stat-label">Players</div>
-        </div>
-        <div class="stat">
-          <div class="stat-value">${sampleCount}</div>
-          <div class="stat-label">Samples</div>
-        </div>
-      `;
-
-      // Score and goals
-      const goals = matchData.goals || [];
-      const blueGoals = goals.filter(g => g.team === 'blue');
-      const redGoals = goals.filter(g => g.team === 'red');
-      document.getElementById('blueScore').textContent = blueGoals.length;
-      document.getElementById('redScore').textContent = redGoals.length;
-
-      if (goals.length > 0) {
-        const formatGoalTime = (ms) => {
-          const secs = Math.floor(ms / 1000);
-          const mins = Math.floor(secs / 60);
-          return `${mins}:${(secs % 60).toString().padStart(2, '0')}`;
-        };
-        const goalsHtml = goals
-          .sort((a, b) => a.t - b.t)
-          .map(g => `<div style="color: ${g.team === 'blue' ? '#00d4ff' : '#ff4466'};">${formatGoalTime(g.t)} - ${g.scorer}</div>`)
-          .join('');
-        document.getElementById('goalsList').innerHTML = goalsHtml;
-      }
-
-      // Possession bar
-      document.getElementById('possessionBar').innerHTML = `
-        <div class="blue" style="width: ${matchData.possession.blue}%">${matchData.possession.blue.toFixed(0)}%</div>
-        <div class="red" style="width: ${matchData.possession.red}%">${matchData.possession.red.toFixed(0)}%</div>
-      `;
-
-      // Player stats
-      renderPlayerStats();
-
-      // Initial renders
-      renderHeatmap();
-      renderReplayFrame();
-      renderGoalMarkers();
-      updateTimeDisplay();
-
-      // Setup controls
-      setupHeatmapControls();
-      setupReplayControls();
-    }
-
-    function renderGoalMarkers() {
-      const container = document.getElementById('goalMarkers');
-      if (!matchData.goals || matchData.goals.length === 0) {
-        container.innerHTML = '';
-        return;
-      }
-
-      const totalDuration = matchData.duration;
-      let html = '';
-
-      for (const goal of matchData.goals) {
-        const pct = (goal.t / totalDuration) * 100;
-        html += `<div class="goal-marker ${goal.team}" style="left: ${pct}%;" title="${goal.scorer}"></div>`;
-      }
-
-      container.innerHTML = html;
-    }
-
-    function renderPlayerStats() {
-      const container = document.getElementById('playerStats');
-
-      // Group players by team
-      const bluePlayers = [];
-      const redPlayers = [];
-
-      for (const [name, data] of Object.entries(playerAnalysis)) {
-        const playerData = { name, ...data };
-        if (data.team === 'blue') {
-          bluePlayers.push(playerData);
-        } else {
-          redPlayers.push(playerData);
+        
+        if (arr[i] === 40 && currentId !== null) {
+          const [val] = readVarInt(arr, i + 1);
+          if (val === 1) currentTeam = 1;
         }
       }
-
-      function renderPlayerCard(player) {
-        const avgSpeed = player.speeds.length > 0
-          ? (player.speeds.reduce((a, b) => a + b, 0) / player.speeds.length).toFixed(2)
-          : 0;
-        const maxSpeed = player.speeds.length > 0
-          ? player.speeds.reduce((a, b) => Math.max(a, b), 0).toFixed(2)
-          : 0;
-        const distance = player.distanceSum.toFixed(1);
-        const avgX = player.positions.length > 0
-          ? player.positions.reduce((a, p) => a + p.x, 0) / player.positions.length
-          : 0;
-        const avgZ = player.positions.length > 0
-          ? player.positions.reduce((a, p) => a + p.z, 0) / player.positions.length
-          : 0;
-        const totalTime = player.offensiveTime + player.defensiveTime;
-        const offensivePct = totalTime > 0 ? (player.offensiveTime / totalTime * 100).toFixed(0) : 50;
-        const isSelected = selectedPlayers.has(player.name);
-
-        return `
-          <div class="player-card ${player.team} ${isSelected ? 'selected' : ''}" data-player="${player.name}">
-            <div class="player-name">${player.name}</div>
-            <div class="player-stat-row"><span>Distance traveled</span><span>${distance} units</span></div>
-            <div class="player-stat-row"><span>Avg speed</span><span>${avgSpeed}</span></div>
-            <div class="player-stat-row"><span>Max speed</span><span>${maxSpeed}</span></div>
-            <div class="player-stat-row"><span>Offensive time</span><span>${offensivePct}%</span></div>
-            <div class="player-stat-row"><span>Avg position</span><span>${avgX.toFixed(1)}, ${avgZ.toFixed(1)}</span></div>
-          </div>
-        `;
+      
+      if (currentId !== null && currentName !== null) {
+        state.players[currentId] = { name: currentName, team: currentTeam };
       }
-
-      let html = '';
-
-      if (bluePlayers.length > 0) {
-        const blueSelected = bluePlayers.filter(p => selectedPlayers.has(p.name)).length;
-        html += `<div class="team-section">
-          <div class="team-header blue" data-team="blue">Blue Team (${blueSelected}/${bluePlayers.length})</div>
-          <div class="player-stats">${bluePlayers.map(renderPlayerCard).join('')}</div>
-        </div>`;
-      }
-
-      if (redPlayers.length > 0) {
-        const redSelected = redPlayers.filter(p => selectedPlayers.has(p.name)).length;
-        html += `<div class="team-section">
-          <div class="team-header red" data-team="red">Red Team (${redSelected}/${redPlayers.length})</div>
-          <div class="player-stats">${redPlayers.map(renderPlayerCard).join('')}</div>
-        </div>`;
-      }
-
-      container.innerHTML = html;
-
-      // Add click handlers for player cards
-      container.querySelectorAll('.player-card').forEach(card => {
-        card.addEventListener('click', () => {
-          const playerName = card.dataset.player;
-          if (selectedPlayers.has(playerName)) {
-            selectedPlayers.delete(playerName);
-            card.classList.remove('selected');
-          } else {
-            selectedPlayers.add(playerName);
-            card.classList.add('selected');
-          }
-          // Update team header counts
-          renderPlayerStats();
-          renderHeatmap();
-        });
-      });
-
-      // Add click handlers for team headers (toggle all players on that team)
-      container.querySelectorAll('.team-header').forEach(header => {
-        header.addEventListener('click', () => {
-          const team = header.dataset.team;
-          const teamPlayers = Object.entries(playerAnalysis)
-            .filter(([_, data]) => data.team === team)
-            .map(([name, _]) => name);
-
-          // Check if all team players are selected
-          const allSelected = teamPlayers.every(name => selectedPlayers.has(name));
-
-          if (allSelected) {
-            // Deselect all team players
-            teamPlayers.forEach(name => selectedPlayers.delete(name));
-          } else {
-            // Select all team players
-            teamPlayers.forEach(name => selectedPlayers.add(name));
-          }
-
-          renderPlayerStats();
-          renderHeatmap();
-        });
-      });
-
-      // Setup select/deselect all buttons
-      document.getElementById('selectAllPlayers').addEventListener('click', () => {
-        Object.keys(playerAnalysis).forEach(name => selectedPlayers.add(name));
-        renderPlayerStats();
-        renderHeatmap();
-      });
-
-      document.getElementById('deselectAllPlayers').addEventListener('click', () => {
-        selectedPlayers.clear();
-        renderPlayerStats();
-        renderHeatmap();
-      });
     }
-
-    function renderHeatmap() {
-      const canvas = document.getElementById('heatmapCanvas');
-      const ctx = canvas.getContext('2d');
-      const w = canvas.width, h = canvas.height;
-
-      // Clear
-      ctx.fillStyle = '#0a0a12';
-      ctx.fillRect(0, 0, w, h);
-
-      // Draw pitch image as background (flipped vertically to match coordinate system)
-      if (pitchImage.complete && pitchImage.naturalWidth > 0) {
-        ctx.save();
-        ctx.translate(0, h);
-        ctx.scale(1, -1);
-        ctx.drawImage(pitchImage, 0, 0, w, h);
-        ctx.restore();
-      } else {
-        // Fallback to drawn field if image not loaded
-        drawField(ctx, w, h);
-      }
-
-      // Collect positions based on mode
-      let positions = [];
-
-      if (heatmapMode === 'ball') {
-        for (const sample of matchData.samples) {
-          if (sample.ball) positions.push({ x: sample.ball.x, z: sample.ball.z });
-        }
-      } else {
-        // Filter by selected players only
-        for (const [name, data] of Object.entries(playerAnalysis)) {
-          if (selectedPlayers.has(name)) {
-            positions.push(...data.positions);
+    
+    function parseEntityMappings(arr) {
+      const knownIds = new Set(Object.keys(state.players).map(Number));
+      
+      for (let i = 0; i < arr.length - 10; i++) {
+        if (arr[i] === 10) {
+          const [blockLen, afterBlock] = readVarInt(arr, i + 1);
+          if (blockLen >= 20 && blockLen <= 100 && arr[afterBlock] === 8) {
+            const [entityId, afterEntity] = readVarInt(arr, afterBlock + 1);
+            if (entityId > 1000 && entityId < 10000000 && !state.entityMap[entityId]) {
+              const blockEnd = Math.min(i + blockLen + 5, arr.length - 2);
+              for (let j = afterEntity; j < blockEnd; j++) {
+                if (arr[j] === 24) {
+                  const [constId] = readVarInt(arr, j + 1);
+                  if (knownIds.has(constId)) {
+                    state.entityMap[entityId] = constId;
+                    break;
+                  }
+                }
+              }
+            }
           }
         }
       }
-
-      // Create heatmap grid (higher = smoother)
-      const gridSize = 20;
-      const grid = {};
-      let maxCount = 0;
-
-      for (const pos of positions) {
-        const gx = Math.floor((pos.x - FIELD.minX) / (FIELD.maxX - FIELD.minX) * gridSize);
-        const gz = Math.floor((pos.z - FIELD.minZ) / (FIELD.maxZ - FIELD.minZ) * gridSize);
-        const key = `${gx},${gz}`;
-        grid[key] = (grid[key] || 0) + 1;
-        maxCount = Math.max(maxCount, grid[key]);
-      }
-
-      // Draw heatmap - no padding since pitch image fills canvas
-      const cellW = w / gridSize;
-      const cellH = h / gridSize;
-
-      if (maxCount === 0) return; // No data to draw
-
-      // Thermal heat gradient: black -> dark red -> orange -> yellow -> white
-      function getHeatColor(intensity) {
-        let r, g, b;
-        if (intensity < 0.2) {
-          // Black to dark red
-          const t = intensity / 0.2;
-          r = Math.round(139 * t);         // 0 -> 139
-          g = 0;
-          b = 0;
-        } else if (intensity < 0.4) {
-          // Dark red to orange-red
-          const t = (intensity - 0.2) / 0.2;
-          r = Math.round(139 + 116 * t);   // 139 -> 255
-          g = Math.round(69 * t);          // 0 -> 69
-          b = 0;
-        } else if (intensity < 0.6) {
-          // Orange-red to orange
-          const t = (intensity - 0.4) / 0.2;
-          r = 255;
-          g = Math.round(69 + 96 * t);     // 69 -> 165
-          b = 0;
-        } else if (intensity < 0.8) {
-          // Orange to yellow
-          const t = (intensity - 0.6) / 0.2;
-          r = 255;
-          g = Math.round(165 + 90 * t);    // 165 -> 255
-          b = 0;
-        } else {
-          // Yellow to white
-          const t = (intensity - 0.8) / 0.2;
-          r = 255;
-          g = 255;
-          b = Math.round(255 * t);         // 0 -> 255
+    }
+    
+    function parsePositions(arr) {
+      const now = Date.now();
+      for (let i = 0; i < arr.length - 15; i++) {
+        if (arr[i] === 18 && arr[i + 2] === 8) {
+          const sublen = arr[i + 1];
+          if (sublen >= 10 && sublen <= 50) {
+            const [entityId, nextPos] = readVarInt(arr, i + 3);
+            
+            if (entityId > 100 && entityId < 1000000) {
+              for (let j = nextPos; j < Math.min(nextPos + 20, arr.length - 10); j++) {
+                if (arr[j] === 18 && arr[j + 1] === 10 && arr[j + 2] === 13) {
+                  const [x] = readFloat32(arr, j + 3);
+                  if (arr[j + 7] === 21) {
+                    const [z] = readFloat32(arr, j + 8);
+                    
+                    if (Math.abs(x) < 500 && Math.abs(z) < 500) {
+                      const prev = state.positions[entityId];
+                      state.positions[entityId] = {
+                        x, z,
+                        prevX: prev?.x ?? x,
+                        prevZ: prev?.z ?? z,
+                        lastUpdate: now
+                      };
+                      
+                      if (!state.entityMap[entityId]) {
+                        if (state.ballEntityId === null || entityId > state.ballEntityId) {
+                          state.ballEntityId = entityId;
+                        }
+                      }
+                    }
+                  }
+                  break;
+                }
+              }
+            }
+          }
         }
-        return { r, g, b };
-      }
-
-      for (const [key, count] of Object.entries(grid)) {
-        const [gx, gz] = key.split(',').map(Number);
-        const intensity = count / maxCount;
-        const { r, g, b } = getHeatColor(intensity);
-
-        // Higher base alpha for better visibility, scales with intensity
-        const alpha = 0.5 + intensity * 0.45;
-        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        ctx.fillRect(
-          gx * cellW,
-          (gridSize - 1 - gz) * cellH,
-          cellW,
-          cellH
-        );
       }
     }
-
-    function drawField(ctx, w, h) {
-      const pad = 20;
-      const fieldW = w - pad * 2;
-      const fieldH = h - pad * 2;
-
-      // Field background
-      ctx.fillStyle = '#1e4d2b';
-      ctx.fillRect(pad, pad, fieldW, fieldH);
-
-      // Field outline
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(pad, pad, fieldW, fieldH);
-
-      // Center line
-      ctx.beginPath();
-      ctx.moveTo(pad, pad + fieldH / 2);
-      ctx.lineTo(pad + fieldW, pad + fieldH / 2);
-      ctx.stroke();
-
-      // Center circle
-      ctx.beginPath();
-      ctx.arc(pad + fieldW / 2, pad + fieldH / 2, 30, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Goals
-      const goalW = fieldW * 0.3;
-      const goalX = pad + (fieldW - goalW) / 2;
-
-      ctx.strokeStyle = '#00d4ff';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(goalX, pad + fieldH);
-      ctx.lineTo(goalX + goalW, pad + fieldH);
-      ctx.stroke();
-
-      ctx.strokeStyle = '#ff4466';
-      ctx.beginPath();
-      ctx.moveTo(goalX, pad);
-      ctx.lineTo(goalX + goalW, pad);
-      ctx.stroke();
-    }
-
-    function setupHeatmapControls() {
-      const playersBtn = document.getElementById('heatmapPlayers');
-      const ballBtn = document.getElementById('heatmapBall');
-
-      playersBtn.addEventListener('click', () => {
-        playersBtn.classList.add('active');
-        ballBtn.classList.remove('active');
-        heatmapMode = 'players';
-        renderHeatmap();
-      });
-
-      ballBtn.addEventListener('click', () => {
-        ballBtn.classList.add('active');
-        playersBtn.classList.remove('active');
-        heatmapMode = 'ball';
-        renderHeatmap();
-      });
-    }
-
-    let lastGoalIndex = -1;
-
-    function renderReplayFrame() {
-      const canvas = document.getElementById('replayCanvas');
-      const ctx = canvas.getContext('2d');
-      const w = canvas.width, h = canvas.height;
-
-      // Clear and draw pitch image
-      ctx.fillStyle = '#0a0a12';
-      ctx.fillRect(0, 0, w, h);
-
-      // Draw pitch image (flipped vertically to match coordinate system)
-      if (pitchImage.complete && pitchImage.naturalWidth > 0) {
-        ctx.save();
-        ctx.translate(0, h);
-        ctx.scale(1, -1);
-        ctx.drawImage(pitchImage, 0, 0, w, h);
-        ctx.restore();
-      } else {
-        drawFieldWithCorners(ctx, w, h);
-      }
-
-      if (!matchData || currentSampleIndex >= matchData.samples.length) return;
-
-      const sample = matchData.samples[currentSampleIndex];
-
-      // No padding - pitch image fills canvas
-      const scaleX = x => ((x - FIELD.minX) / (FIELD.maxX - FIELD.minX)) * w;
-      const scaleZ = z => h - ((z - FIELD.minZ) / (FIELD.maxZ - FIELD.minZ)) * h;
-
-      // Check for goals
-      checkForGoal(sample.t);
-
-      // Draw ball
-      if (sample.ball) {
-        const bx = scaleX(sample.ball.x);
-        const bz = scaleZ(sample.ball.z);
-
-        ctx.shadowColor = '#fff';
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.arc(bx, bz, 8, 0, Math.PI * 2);
-        ctx.fillStyle = '#fff';
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
-
-      // Draw players using car images
-      if (!sample.players) return;
-      const carWidth = 24;
-      const carHeight = 40;
-
-      for (const p of sample.players) {
-        const px = scaleX(p.x);
-        const pz = scaleZ(p.z);
-        const carImage = p.team === 'blue' ? blueCarImage : redCarImage;
-
-        // Calculate rotation from velocity (add PI to flip 180 degrees)
-        let rotation = 0;
-        if (p.vx !== 0 || p.vz !== 0) {
-          rotation = Math.atan2(-p.vx, -p.vz) + Math.PI;
-        }
-
-        ctx.save();
-        ctx.translate(px, pz);
-        ctx.rotate(rotation);
-
-        // Draw car image if loaded, fallback to circle
-        if (carImage.complete && carImage.naturalWidth > 0) {
-          ctx.drawImage(carImage, -carWidth / 2, -carHeight / 2, carWidth, carHeight);
-        } else {
-          // Fallback to colored circle
-          const color = p.team === 'blue' ? '#00d4ff' : '#ff4466';
-          ctx.beginPath();
-          ctx.arc(0, 0, 10, 0, Math.PI * 2);
-          ctx.fillStyle = color;
-          ctx.fill();
-        }
-
-        ctx.restore();
-
-        // Name (drawn without rotation)
-        ctx.font = 'bold 10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#fff';
-        ctx.shadowColor = '#000';
-        ctx.shadowBlur = 3;
-        ctx.fillText(p.name.slice(0, 6), px, pz - 25);
-        ctx.shadowBlur = 0;
-      }
-    }
-
-    function drawFieldWithCorners(ctx, w, h) {
-      const pad = 20;
-      const fieldW = w - pad * 2;
-      const fieldH = h - pad * 2;
-      const corner = 30; // 45-degree corner size
-
-      // Field background with cut corners
-      ctx.fillStyle = '#1e4d2b';
-      ctx.beginPath();
-      ctx.moveTo(pad + corner, pad);
-      ctx.lineTo(pad + fieldW - corner, pad);
-      ctx.lineTo(pad + fieldW, pad + corner);
-      ctx.lineTo(pad + fieldW, pad + fieldH - corner);
-      ctx.lineTo(pad + fieldW - corner, pad + fieldH);
-      ctx.lineTo(pad + corner, pad + fieldH);
-      ctx.lineTo(pad, pad + fieldH - corner);
-      ctx.lineTo(pad, pad + corner);
-      ctx.closePath();
-      ctx.fill();
-
-      // Field outline
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Center line
-      ctx.beginPath();
-      ctx.moveTo(pad, pad + fieldH / 2);
-      ctx.lineTo(pad + fieldW, pad + fieldH / 2);
-      ctx.stroke();
-
-      // Center circle
-      ctx.beginPath();
-      ctx.arc(pad + fieldW / 2, pad + fieldH / 2, 30, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Goals
-      const goalW = fieldW * 0.3;
-      const goalX = pad + (fieldW - goalW) / 2;
-
-      ctx.strokeStyle = '#00d4ff';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(goalX, pad + fieldH);
-      ctx.lineTo(goalX + goalW, pad + fieldH);
-      ctx.stroke();
-
-      ctx.strokeStyle = '#ff4466';
-      ctx.beginPath();
-      ctx.moveTo(goalX, pad);
-      ctx.lineTo(goalX + goalW, pad);
-      ctx.stroke();
-    }
-
-    function checkForGoal(currentTime) {
-      if (!matchData.goals || matchData.goals.length === 0) return;
-
-      for (let i = 0; i < matchData.goals.length; i++) {
-        const goal = matchData.goals[i];
-        // Show goal if we're within 500ms after the goal time
-        if (currentTime >= goal.t && currentTime <= goal.t + 2000 && lastGoalIndex !== i) {
-          lastGoalIndex = i;
-          showGoalAlert(goal);
+    
+    function parseGameState(arr) {
+      for (let i = 0; i < arr.length - 4; i++) {
+        if (arr[i] === 13) {
+          const [time] = readFloat32(arr, i + 1);
+          if (time >= 0 && time <= 600) {
+            state.matchTime = time;
+            const mins = Math.floor(time / 60);
+            const secs = Math.floor(time % 60);
+            document.getElementById('matchTime').textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+          }
           break;
         }
       }
     }
-
-    function showGoalAlert(goal) {
-      const alert = document.getElementById('goalAlert');
-      const scorer = document.getElementById('goalScorer');
-      const color = goal.team === 'blue' ? '#00d4ff' : '#ff4466';
-
-      alert.style.borderColor = color;
-      alert.style.color = color;
-      scorer.textContent = goal.scorer;
-
-      alert.style.display = 'block';
-
-      setTimeout(() => {
-        alert.style.display = 'none';
-      }, 2000);
-    }
-
-    function setupReplayControls() {
-      const playBtn = document.getElementById('playBtn');
-      const timeline = document.getElementById('timeline');
-      const speedSelect = document.getElementById('speedSelect');
-
-      playBtn.addEventListener('click', togglePlayback);
-
-      timeline.addEventListener('click', (e) => {
-        const rect = timeline.getBoundingClientRect();
-        const pct = (e.clientX - rect.left) / rect.width;
-        currentSampleIndex = Math.min(
-          Math.floor(pct * matchData.samples.length),
-          matchData.samples.length - 1
-        );
-        if (currentSampleIndex < 0) currentSampleIndex = 0;
-        // Reset goal tracking based on new position
-        lastGoalIndex = -1;
-        if (matchData.goals) {
-          const currentTime = matchData.samples[currentSampleIndex]?.t || 0;
-          for (let i = matchData.goals.length - 1; i >= 0; i--) {
-            if (matchData.goals[i].t < currentTime) {
-              lastGoalIndex = i;
+    
+    function parseGoal(arr) {
+      const now = Date.now();
+      let scorer = null, team = null;
+      
+      for (let i = 0; i < arr.length - 3; i++) {
+        if (arr[i] === 8) {
+          const [val] = readVarInt(arr, i + 1);
+          if (val >= 100 && val < 15000) {
+            const player = state.players[val];
+            if (player) {
+              scorer = player.name;
+              team = player.team === 1 ? 'blue' : 'red';
               break;
             }
           }
         }
-        renderReplayFrame();
-        updateTimeDisplay();
-      });
-
-      speedSelect.addEventListener('change', (e) => {
-        playbackSpeed = parseFloat(e.target.value);
-      });
-    }
-
-    function togglePlayback() {
-      isPlaying = !isPlaying;
-      document.getElementById('playBtn').textContent = isPlaying ? '⏸' : '▶';
-
-      if (isPlaying) {
-        lastFrameTime = performance.now();
-        animate();
-      } else if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
       }
+      
+      if (state.recording && state.matchData.startTime) {
+        state.matchData.goals.push({
+          t: now - state.matchData.startTime,
+          matchTime: state.matchTime,
+          scorer,
+          team
+        });
+      }
+      
+      // Show goal alert
+      showGoalAlert({ scorer, team });
     }
-
-    function animate() {
-      if (!isPlaying) return;
-
-      const now = performance.now();
-      const elapsed = now - lastFrameTime;
-
-      // Each sample is 200ms, adjust for playback speed
-      const samplesPerMs = playbackSpeed / 200;
-      const samplesToAdvance = elapsed * samplesPerMs;
-
-      if (samplesToAdvance >= 1) {
-        currentSampleIndex = Math.min(
-          currentSampleIndex + Math.floor(samplesToAdvance),
-          matchData.samples.length - 1
-        );
-        lastFrameTime = now;
-        renderReplayFrame();
-        updateTimeDisplay();
-
-        if (currentSampleIndex >= matchData.samples.length - 1) {
-          isPlaying = false;
-          document.getElementById('playBtn').textContent = '▶';
-          return;
+    
+    // ==================== LIVE VIEW RENDERING ====================
+    function updateLiveView() {
+      document.getElementById('playerCount').textContent = Object.keys(state.players).length;
+      
+      // Update player list
+      const playerList = document.getElementById('playerList');
+      let html = '';
+      
+      Object.entries(state.players).forEach(([id, p]) => {
+        let pos = null;
+        for (const [eId, data] of Object.entries(state.positions)) {
+          if (state.entityMap[eId] == id) {
+            pos = data;
+            break;
+          }
         }
-      }
-
-      animationFrame = requestAnimationFrame(animate);
+        
+        html += `
+          <div class="player-item">
+            <div class="player-dot ${p.team === 1 ? 'blue' : 'red'}"></div>
+            <span class="player-name">${p.name}${id == playerId ? ' (you)' : ''}</span>
+            <span class="player-position">${pos ? `${pos.x.toFixed(1)}, ${pos.z.toFixed(1)}` : ''}</span>
+          </div>
+        `;
+      });
+      
+      playerList.innerHTML = html || '<div style="color:#555;">No players yet</div>';
+      
+      // Update detailed player list
+      const detailedList = document.getElementById('detailedPlayerList');
+      let detailedHtml = '<div style="margin-bottom:10px;"><strong>Blue Team</strong></div>';
+      
+      Object.entries(state.players).filter(([_, p]) => p.team === 1).forEach(([id, p]) => {
+        detailedHtml += `<div style="color:#00d4ff; padding:2px 0;">${p.name}</div>`;
+      });
+      
+      detailedHtml += '<div style="margin:10px 0 5px;"><strong>Red Team</strong></div>';
+      Object.entries(state.players).filter(([_, p]) => p.team === 0).forEach(([id, p]) => {
+        detailedHtml += `<div style="color:#ff4466; padding:2px 0;">${p.name}</div>`;
+      });
+      
+      detailedList.innerHTML = detailedHtml;
+      
+      // Render canvas
+      renderCanvas();
     }
-
-    function updateTimeDisplay() {
-      if (!matchData || !matchData.samples || matchData.samples.length === 0) return;
-
-      const currentTime = matchData.samples[currentSampleIndex]?.t || 0;
-      const totalTime = matchData.duration;
-
-      const formatTime = (ms) => {
-        const secs = Math.floor(ms / 1000);
-        const mins = Math.floor(secs / 60);
-        return `${mins}:${(secs % 60).toString().padStart(2, '0')}`;
+    
+    function renderCanvas() {
+      const canvas = document.getElementById('liveCanvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      
+      ctx.clearRect(0, 0, w, h);
+      
+      // Draw field
+      ctx.fillStyle = '#1e4d2b';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Center line
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, h/2);
+      ctx.lineTo(w, h/2);
+      ctx.stroke();
+      
+      // Center circle
+      ctx.beginPath();
+      ctx.arc(w/2, h/2, 40, 0, Math.PI*2);
+      ctx.stroke();
+      
+      // Goals
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(w*0.35, h-1);
+      ctx.lineTo(w*0.65, h-1);
+      ctx.stroke();
+      
+      ctx.strokeStyle = '#ff4466';
+      ctx.beginPath();
+      ctx.moveTo(w*0.35, 1);
+      ctx.lineTo(w*0.65, 1);
+      ctx.stroke();
+      
+      // Scale
+      const scaleX = x => ((x - FIELD.minX) / (FIELD.maxX - FIELD.minX)) * w;
+      const scaleZ = z => h - ((z - FIELD.minZ) / (FIELD.maxZ - FIELD.minZ)) * h;
+      
+      // Draw ball
+      if (state.ballEntityId && state.positions[state.ballEntityId]) {
+        const ball = state.positions[state.ballEntityId];
+        const bx = scaleX(ball.x);
+        const bz = scaleZ(ball.z);
+        
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(bx, bz, 6, 0, Math.PI*2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+      
+      // Draw players
+      Object.entries(state.positions).forEach(([entityId, pos]) => {
+        const constId = state.entityMap[entityId];
+        if (!constId || constId === state.ballEntityId) return;
+        
+        const player = state.players[constId];
+        if (!player) return;
+        
+        const px = scaleX(pos.x);
+        const pz = scaleZ(pos.z);
+        const color = player.team === 1 ? '#00d4ff' : '#ff4466';
+        
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(px, pz, 8, 0, Math.PI*2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Name
+        ctx.font = 'bold 8px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#000';
+        ctx.shadowBlur = 3;
+        ctx.fillText(player.name.slice(0, 6), px, pz - 15);
+        ctx.shadowBlur = 0;
+      });
+      
+      requestAnimationFrame(renderCanvas);
+    }
+    
+    function showGoalAlert(goal) {
+      const alert = document.createElement('div');
+      alert.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.9); padding: 30px 60px; border-radius: 12px;
+        text-align: center; z-index: 1000; border: 2px solid ${goal.team === 'blue' ? '#00d4ff' : '#ff4466'};
+        color: ${goal.team === 'blue' ? '#00d4ff' : '#ff4466'}; font-size: 48px; font-weight: bold;
+      `;
+      alert.innerHTML = `GOAL!<br><span style="font-size:24px;">${goal.scorer || 'Someone'}</span>`;
+      document.body.appendChild(alert);
+      setTimeout(() => alert.remove(), 2000);
+    }
+    
+    // ==================== CONNECTION ====================
+    function connectToServer(server) {
+      if (ws) ws.close();
+      
+      playerId = null;
+      myName = null;
+      state.players = {};
+      state.entityMap = {};
+      state.positions = {};
+      state.ballEntityId = null;
+      
+      updateStatus('connecting', 'Connecting...');
+      
+      try {
+        ws = new WebSocket(server.url);
+        ws.binaryType = 'arraybuffer';
+        
+        ws.onopen = () => {
+          updateStatus('connected', `Connected to ${server.name}`);
+          
+          const username = `Duck_${Math.floor(Math.random() * 1000)}`;
+          const uid = Array(28).fill().map(() => 
+            'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 62)]
+          ).join('');
+          
+          const authPacket = createAuthPacket(username, uid, document.getElementById('passwordInput').value || 'rodshot');
+          ws.send(authPacket);
+          
+          // Start AFK prevention
+          if (afkInterval) clearInterval(afkInterval);
+          afkInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN && playerId) {
+              ws.send(createAFKPacket(playerId));
+            }
+          }, 10000);
+        };
+        
+        ws.onmessage = (event) => {
+          const data = new Uint8Array(event.data);
+          parseMessage(data);
+        };
+        
+        ws.onclose = () => {
+          updateStatus('disconnected', 'Disconnected');
+          if (afkInterval) clearInterval(afkInterval);
+        };
+        
+        ws.onerror = () => {
+          updateStatus('disconnected', 'Connection error');
+        };
+        
+      } catch (e) {
+        updateStatus('disconnected', 'Connection failed');
+      }
+    }
+    
+    function disconnect() {
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+      if (afkInterval) clearInterval(afkInterval);
+      updateStatus('disconnected', 'Disconnected');
+    }
+    
+    // ==================== RECORDING ====================
+    function startRecording() {
+      state.recording = true;
+      state.matchData = { startTime: Date.now(), samples: [], goals: [] };
+      recordingInterval = setInterval(captureSample, 200);
+      document.getElementById('startRecordBtn').textContent = '⏹ Stop';
+    }
+    
+    function stopRecording() {
+      state.recording = false;
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        recordingInterval = null;
+      }
+      saveMatch();
+      document.getElementById('startRecordBtn').textContent = '⏺ Record';
+    }
+    
+    function captureSample() {
+      if (!state.recording) return;
+      
+      const now = Date.now();
+      const t = now - state.matchData.startTime;
+      
+      const ball = state.ballEntityId && state.positions[state.ballEntityId] ? {
+        x: state.positions[state.ballEntityId].x,
+        z: state.positions[state.ballEntityId].z
+      } : null;
+      
+      const players = [];
+      Object.entries(state.positions).forEach(([entityId, pos]) => {
+        const constId = state.entityMap[entityId];
+        if (!constId || constId === state.ballEntityId) return;
+        
+        const player = state.players[constId];
+        if (!player) return;
+        
+        players.push({
+          name: player.name,
+          team: player.team === 1 ? 'blue' : 'red',
+          x: pos.x,
+          z: pos.z
+        });
+      });
+      
+      state.matchData.samples.push({ t, ball, players });
+    }
+    
+    function saveMatch() {
+      const exportData = {
+        recorded: new Date(state.matchData.startTime).toISOString(),
+        duration: Date.now() - state.matchData.startTime,
+        players: state.players,
+        goals: state.matchData.goals,
+        samples: state.matchData.samples
       };
-
-      document.getElementById('timeDisplay').textContent =
-        `${formatTime(currentTime)} / ${formatTime(totalTime)}`;
-
-      const pct = matchData.samples.length > 1
-        ? (currentSampleIndex / (matchData.samples.length - 1)) * 100
-        : 0;
-      document.getElementById('timelineProgress').style.width = `${pct}%`;
-      document.getElementById('timelineThumb').style.left = `${pct}%`;
+      
+      const saved = JSON.parse(localStorage.getItem('duck-saved-games') || '[]');
+      saved.push({
+        id: Date.now(),
+        name: `Match ${new Date().toLocaleString()}`,
+        data: exportData
+      });
+      localStorage.setItem('duck-saved-games', JSON.stringify(saved));
+      
+      updateSavedGames();
     }
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (!matchData) return;
-
-      switch(e.code) {
-        case 'Space':
-          e.preventDefault();
-          togglePlayback();
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          currentSampleIndex = Math.max(0, currentSampleIndex - 10);
-          renderReplayFrame();
-          updateTimeDisplay();
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          currentSampleIndex = Math.min(matchData.samples.length - 1, currentSampleIndex + 10);
-          renderReplayFrame();
-          updateTimeDisplay();
-          break;
+    
+    function updateSavedGames() {
+      const saved = JSON.parse(localStorage.getItem('duck-saved-games') || '[]');
+      const container = document.getElementById('savedGamesList');
+      
+      if (saved.length === 0) {
+        container.innerHTML = '<div style="color:#555;">No saved games</div>';
+        return;
       }
-    });
+      
+      container.innerHTML = saved.reverse().map(game => {
+        const blueGoals = game.data.goals?.filter(g => g.team === 'blue').length || 0;
+        const redGoals = game.data.goals?.filter(g => g.team === 'red').length || 0;
+        
+        return `
+          <div class="game-card" onclick="viewGame('${game.id}')">
+            <div class="game-date">${new Date(game.data.recorded).toLocaleString()}</div>
+            <div class="game-score">
+              <span style="color:#00d4ff;">${blueGoals}</span>
+              <span>-</span>
+              <span style="color:#ff4466;">${redGoals}</span>
+            </div>
+            <div style="color:#888;">${Object.keys(game.data.players).length} players</div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    window.viewGame = function(id) {
+      const saved = JSON.parse(localStorage.getItem('duck-saved-games') || '[]');
+      const game = saved.find(g => g.id == id);
+      if (game) {
+        const win = window.open('');
+        win.document.write(createReplayHTML(game.data));
+      }
+    };
+    
+    function createReplayHTML(data) {
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Match Replay</title>
+          <style>
+            body { background: #0d0d1a; color: #fff; font-family: Arial; margin:0; padding:20px; }
+            canvas { display:block; margin:0 auto; border:2px solid #00d4ff; border-radius:8px; }
+            .controls { text-align:center; margin-top:20px; }
+            button { background:#00d4ff; border:none; padding:10px 20px; margin:0 5px; cursor:pointer; }
+          </style>
+        </head>
+        <body>
+          <canvas id="replayCanvas" width="450" height="650"></canvas>
+          <div class="controls">
+            <button onclick="play()">▶ Play</button>
+            <button onclick="pause()">⏸ Pause</button>
+            <span id="time">0:00</span>
+          </div>
+          <script>
+            const gameData = ${JSON.stringify(data)};
+            const canvas = document.getElementById('replayCanvas');
+            const ctx = canvas.getContext('2d');
+            const FIELD = { minX: -15, maxX: 30, minZ: -25, maxZ: 40 };
+            
+            let frame = 0, playing = false;
+            
+            function draw() {
+              const sample = gameData.samples[frame] || gameData.samples[0];
+              if (!sample) return;
+              
+              ctx.clearRect(0,0,450,650);
+              ctx.fillStyle = '#1e4d2b';
+              ctx.fillRect(0,0,450,650);
+              
+              const scaleX = x => ((x - FIELD.minX) / (FIELD.maxX - FIELD.minX)) * 450;
+              const scaleZ = z => 650 - ((z - FIELD.minZ) / (FIELD.maxZ - FIELD.minZ)) * 650;
+              
+              if (sample.ball) {
+                const x = scaleX(sample.ball.x);
+                const z = scaleZ(sample.ball.z);
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(x, z, 5, 0, Math.PI*2);
+                ctx.fill();
+              }
+              
+              sample.players?.forEach(p => {
+                const x = scaleX(p.x);
+                const z = scaleZ(p.z);
+                ctx.fillStyle = p.team === 'blue' ? '#00d4ff' : '#ff4466';
+                ctx.beginPath();
+                ctx.arc(x, z, 8, 0, Math.PI*2);
+                ctx.fill();
+              });
+              
+              const secs = Math.floor(sample.t / 1000);
+              document.getElementById('time').textContent = \`\${Math.floor(secs/60)}:\${(secs%60).toString().padStart(2,'0')}\`;
+            }
+            
+            function play() {
+              playing = true;
+              function step() {
+                if (!playing) return;
+                frame = Math.min(frame + 1, gameData.samples.length - 1);
+                draw();
+                setTimeout(step, 200);
+              }
+              step();
+            }
+            
+            function pause() { playing = false; }
+            
+            draw();
+          <\/script>
+        </body>
+        </html>
+      `;
+    }
+    
+    // ==================== UI HELPERS ====================
+    function updateStatus(status, text) {
+      const dot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      
+      dot.className = `status-dot ${status}`;
+      statusText.textContent = text;
+      
+      document.getElementById('connectionStatus').className = `status-dot ${status}`;
+      document.getElementById('connectBtn').disabled = !selectedServer;
+      document.getElementById('disconnectBtn').disabled = status !== 'connected';
+    }
+    
+    // ==================== INIT ====================
+    function init() {
+      // Render server lists
+      const nyDiv = document.getElementById('ny-servers');
+      SERVERS.ny.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'server-card';
+        div.innerHTML = `<span class="name">${s.name}</span><span class="status"></span>`;
+        div.onclick = () => {
+          document.querySelectorAll('.server-card').forEach(c => c.classList.remove('selected'));
+          div.classList.add('selected');
+          selectedServer = s;
+          document.getElementById('connectBtn').disabled = false;
+        };
+        nyDiv.appendChild(div);
+      });
+      
+      const fraDiv = document.getElementById('fra-servers');
+      SERVERS.fra.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'server-card';
+        div.innerHTML = `<span class="name">${s.name}</span><span class="status"></span>`;
+        div.onclick = () => {
+          document.querySelectorAll('.server-card').forEach(c => c.classList.remove('selected'));
+          div.classList.add('selected');
+          selectedServer = s;
+          document.getElementById('connectBtn').disabled = false;
+        };
+        fraDiv.appendChild(div);
+      });
+      
+      // Connect button
+      document.getElementById('connectBtn').onclick = () => {
+        if (selectedServer) connectToServer(selectedServer);
+      };
+      
+      document.getElementById('disconnectBtn').onclick = disconnect;
+      
+      // Manual spectator
+      document.getElementById('manualSpectatorBtn').onclick = () => {
+        if (ws && ws.readyState === WebSocket.OPEN && playerId) {
+          ws.send(createSpectatorPacket(playerId));
+        }
+      };
+      
+      // Record button
+      document.getElementById('startRecordBtn').onclick = () => {
+        if (state.recording) stopRecording();
+        else startRecording();
+      };
+      
+      // Tab switching
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.onclick = () => {
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          
+          document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+          document.getElementById(tab.dataset.tab + 'Tab').classList.remove('hidden');
+        };
+      });
+      
+      // Saved games
+      document.getElementById('showSavedBtn').onclick = () => {
+        document.querySelector('[data-tab="saved"]').click();
+        updateSavedGames();
+      };
+      
+      document.getElementById('clearSavedBtn').onclick = () => {
+        if (confirm('Clear all saved games?')) {
+          localStorage.removeItem('duck-saved-games');
+          updateSavedGames();
+        }
+      };
+      
+      updateSavedGames();
+      updateStatus('disconnected', 'Not connected');
+      renderCanvas();
+    }
+    
+    init();
   </script>
 </body>
 </html>
