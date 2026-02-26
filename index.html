@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Duck Tournament Anti-Cheat Analyzer</title>
+    <title>DUCK TOURNAMENT ANALYZER v23.0</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -485,7 +485,7 @@
 <body>
     <div class="container">
         <h1>🦆 DUCK TOURNAMENT ANALYZER v23.0</h1>
-        <div class="subtitle">Professional Grade • Duck Mod Packet Parsing • Auto-Spectator • Full Recording</div>
+        <div class="subtitle">Professional Grade • Unity WebGL Protocol • Auto-Spectator • Full Recording</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -621,13 +621,23 @@
         </div>
         
         <div class="footer">
-            🦆 DUCK ANALYZER v23.0 • DUCK MOD PACKET PARSING • AUTO-SPECTATOR • FULL RECORDING • AFK PREVENTION<br>
+            🦆 DUCK ANALYZER v23.0 • UNITY WEBGL PROTOCOL • AUTO-SPECTATOR • FULL RECORDING • AFK PREVENTION<br>
             Works standalone on GitHub Pages • Password: rodshot
         </div>
     </div>
 
     <script>
-        // ==================== DUCK MOD PACKET PARSING ====================
+        // ==================== VARINT FUNCTIONS (Unity WebGL Protocol) ====================
+        const w7bit = num => {
+            let r = [];
+            while (num >= 128) {
+                r.push((128 | num) % 256);
+                num >>= 7;
+            }
+            r.push(num % 256);
+            return r;
+        };
+
         const readVarInt = (arr, start) => {
             let result = 0, shift = 0, pos = start;
             while (pos < arr.length && shift < 35) {
@@ -658,16 +668,6 @@
             return ["", start];
         };
 
-        const w7bit = num => {
-            let r = [];
-            while (num >= 128) {
-                r.push((128 | num) % 256);
-                num >>= 7;
-            }
-            r.push(num % 256);
-            return r;
-        };
-
         // ==================== TOURNAMENT SERVERS ====================
         const TOURNAMENT_SERVERS = {
             'ny': {
@@ -694,27 +694,47 @@
             }
         };
 
-        // ==================== PACKET BUILDERS ====================
+        // ==================== PACKET BUILDERS (Unity WebGL Format) ====================
         function createAuthPacket(username, uid, password) {
             let usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
             let uidBytes = Array.from(uid).map(c => c.charCodeAt(0));
             let pwdBytes = Array.from(password).map(c => c.charCodeAt(0));
-            let teamBytes = w7bit(2); // spectator mode
             
+            // Unity WebGL auth packet format from capture
             let dataBytes = [
                 0x0a, usernameBytes.length, ...usernameBytes,
                 0x12, uidBytes.length, ...uidBytes,
                 0x18, 0xe6, 0x06,
-                0x20, ...teamBytes,
+                0x20, 0x02, // team = spectator (2)
                 0x2a, pwdBytes.length, ...pwdBytes,
                 0x38, 0x01
             ];
             
-            return new Uint8Array([0x08, 0x01, 0x12, dataBytes.length, ...dataBytes]);
+            let lengthBytes = w7bit(dataBytes.length);
+            return new Uint8Array([0x0a, ...lengthBytes, 0x08, 0x01, 0x12, dataBytes.length, ...dataBytes]);
+        }
+
+        function createSpectatorPacket() {
+            // Unity WebGL expects playerId = 0 for self-initiated commands
+            const msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
+            const idBytes = w7bit(0); // CRITICAL: Use 0, not playerId
+            
+            // Exact format from network capture
+            const innerPacket = [
+                0x08, 0x05,              // Packet ID 5 (chat)
+                0x12, 0x0c,               // Data length
+                0x08, ...idBytes,          // playerId = 0
+                0x12, msgBytes.length, ...msgBytes
+            ];
+            
+            const lengthBytes = w7bit(innerPacket.length);
+            return new Uint8Array([0x0a, ...lengthBytes, ...innerPacket]);
         }
 
         function createAFKPacket(playerId) {
+            // Unity WebGL movement packet format
             let idBytes = w7bit(playerId);
+            
             return new Uint8Array([
                 0x08, 0x07, 0x12, 0x0a,
                 0x08, 0x01,
@@ -784,6 +804,13 @@
             const logContent = document.getElementById('logContent');
             if (logContent) logContent.innerHTML = '<div class="log-entry"><span class="log-time">[SYSTEM]</span> <span class="log-info">Logs cleared.</span></div>';
             addLog('Logs cleared by user', 'warning');
+        }
+
+        function toggleMovementLogging() {
+            movementLogging = !movementLogging;
+            const btn = document.getElementById('logToggle');
+            if (btn) btn.innerHTML = movementLogging ? '📝 LOG: ON' : '📝 LOG: OFF';
+            addLog(`[SYSTEM] Movement logging ${movementLogging ? 'enabled' : 'disabled'}`, 'info');
         }
 
         // ==================== SERVER UI ====================
@@ -1070,7 +1097,7 @@
             
             if (recording && currentRecording) {
                 currentRecording.goals.push({
-                    t: Date.now() - recordingStartTime,
+                    t: now - recordingStartTime,
                     scorer,
                     team
                 });
@@ -1084,28 +1111,17 @@
                 return;
             }
             
-            if (!playerId) {
-                addLog('[ERROR] No player ID yet', 'error');
-                return;
-            }
-            
-            addLog(`[SPECTATOR] Switching to spectator mode...`, 'info');
+            addLog('[SPECTATOR] Sending /team spectator command with Unity protocol...', 'info');
             
             try {
-                const msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
-                const idBytes = w7bit(playerId);
-                
-                const innerPacket = [
-                    0x08, 0x05, 0x12, 0x0c,
-                    0x08, ...idBytes,
-                    0x12, msgBytes.length, ...msgBytes
-                ];
-                
-                const lenBytes = w7bit(innerPacket.length);
-                const packet = new Uint8Array([0x0a, ...lenBytes, ...innerPacket]);
+                const packet = createSpectatorPacket(); // Uses playerId = 0
+                const hexPacket = Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                addLog(`[SPECTATOR] Packet: ${hexPacket}`, 'info');
                 
                 ws.send(packet);
-                addLog('[SPECTATOR] ✅ Spectator command sent', 'success');
+                spectatorSent = true;
+                addLog('[SPECTATOR] ✅ Command sent', 'success');
+                document.getElementById('spectatorStatus').innerHTML = '✅ SENT';
                 
             } catch (e) {
                 addLog(`[ERROR] Failed: ${e.message}`, 'error');
@@ -1127,6 +1143,7 @@
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     const packet = createAFKPacket(playerId);
                     ws.send(packet);
+                    if (movementLogging) addLog('[AFK] Keep-alive sent', 'info');
                 } else {
                     stopAFKPrevention();
                 }
@@ -1229,7 +1246,7 @@
                         authenticated = true;
                         addLog('[AUTH] ✅ Authentication successful', 'success');
                         
-                        if (document.getElementById('autoSpectator').checked) {
+                        if (document.getElementById('autoSpectator').checked && !spectatorSent) {
                             setTimeout(sendSpectatorCommand, 1000);
                         }
                     }
@@ -1476,7 +1493,7 @@
             setInterval(drawCanvas, 50);
             
             addLog('[SYSTEM] 🦆 Duck Analyzer v23.0 initialized', 'success');
-            addLog('[SYSTEM] Duck Mod packet parsing active', 'info');
+            addLog('[SYSTEM] Unity WebGL protocol active', 'info');
             addLog('[SYSTEM] Auto-spectator enabled', 'info');
         });
     </script>
