@@ -1,1176 +1,1484 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DUCK ANALYZER - Live Tournament Monitor</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: linear-gradient(145deg, #0d0d1a 0%, #1a1a2e 100%);
-      color: #e0e0e0;
-      min-height: 100vh;
-    }
-    
-    .header {
-      background: linear-gradient(90deg, rgba(0,212,255,0.15) 0%, rgba(255,68,102,0.15) 100%);
-      padding: 20px 30px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .logo {
-      font-size: 24px;
-      font-weight: 600;
-    }
-    .logo .duck { color: #00d4ff; }
-    .logo .mod { color: #888; font-weight: 300; margin-left: 8px; }
-    
-    .main-grid {
-      display: grid;
-      grid-template-columns: 350px 1fr;
-      gap: 20px;
-      padding: 20px 30px;
-    }
-    
-    @media (max-width: 1000px) {
-      .main-grid { grid-template-columns: 1fr; }
-    }
-    
-    /* Server Panel */
-    .server-panel {
-      background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
-      border: 1px solid rgba(0,212,255,0.2);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    
-    .panel-header {
-      background: rgba(0,212,255,0.1);
-      padding: 12px 16px;
-      font-weight: 600;
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .panel-content { padding: 16px; }
-    
-    .server-group {
-      margin-bottom: 20px;
-    }
-    
-    .group-title {
-      color: #00d4ff;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 10px;
-      text-transform: uppercase;
-    }
-    
-    .server-card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(0,212,255,0.1);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .server-card:hover {
-      background: rgba(0,212,255,0.1);
-      border-color: #00d4ff;
-    }
-    .server-card.selected {
-      background: rgba(0,212,255,0.15);
-      border-color: #00d4ff;
-      box-shadow: 0 0 15px rgba(0,212,255,0.3);
-    }
-    .server-card .name { font-weight: 600; }
-    .server-card .status {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #4ade80;
-      box-shadow: 0 0 10px #4ade80;
-    }
-    .server-card .status.offline { background: #ff4466; box-shadow: 0 0 10px #ff4466; }
-    
-    .password-input {
-      width: 100%;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(0,212,255,0.3);
-      border-radius: 6px;
-      padding: 10px 12px;
-      color: #fff;
-      margin: 10px 0;
-    }
-    
-    .connect-btn {
-      width: 100%;
-      background: linear-gradient(145deg, #00d4ff 0%, #00a0cc 100%);
-      border: none;
-      color: #000;
-      padding: 12px;
-      border-radius: 6px;
-      font-weight: 600;
-      cursor: pointer;
-      margin: 5px 0;
-    }
-    .connect-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    
-    .status-indicator {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 15px;
-      padding: 10px;
-      background: rgba(255,255,255,0.03);
-      border-radius: 6px;
-    }
-    .status-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-    }
-    .status-dot.connected { background: #4ade80; box-shadow: 0 0 10px #4ade80; }
-    .status-dot.connecting { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
-    .status-dot.disconnected { background: #ff4466; box-shadow: 0 0 10px #ff4466; }
-    
-    /* Live View Panel */
-    .live-panel {
-      background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
-      border: 1px solid rgba(0,212,255,0.2);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    
-    .field-container {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 45/65;
-      max-width: 500px;
-      margin: 0 auto;
-      background: #0a0a12;
-    }
-    
-    #liveCanvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-    
-    .stats-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px 16px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-    
-    .player-list {
-      max-height: 200px;
-      overflow-y: auto;
-      padding: 10px 16px;
-    }
-    
-    .player-item {
-      display: flex;
-      align-items: center;
-      padding: 4px 0;
-    }
-    .player-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 8px;
-    }
-    .player-dot.blue { background: #00d4ff; box-shadow: 0 0 10px #00d4ff; }
-    .player-dot.red { background: #ff4466; box-shadow: 0 0 10px #ff4466; }
-    .player-name { flex: 1; }
-    .player-position { color: #888; font-size: 11px; }
-    
-    .tabs {
-      display: flex;
-      gap: 2px;
-      background: rgba(0,0,0,0.3);
-      padding: 4px;
-      border-radius: 8px;
-      margin: 10px 16px;
-    }
-    .tab {
-      flex: 1;
-      padding: 8px;
-      text-align: center;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-    .tab.active {
-      background: #00d4ff;
-      color: #000;
-    }
-    
-    .saved-games {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 10px;
-      padding: 16px;
-    }
-    
-    .game-card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(0,212,255,0.1);
-      border-radius: 8px;
-      padding: 12px;
-      cursor: pointer;
-    }
-    .game-card:hover { border-color: #00d4ff; }
-    .game-date { font-size: 11px; color: #888; }
-    .game-score {
-      display: flex;
-      justify-content: space-between;
-      font-size: 18px;
-      margin: 8px 0;
-    }
-    
-    .btn {
-      background: linear-gradient(145deg, #00d4ff 0%, #00a0cc 100%);
-      border: none;
-      color: #000;
-      padding: 8px 16px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-    .btn.small { padding: 4px 8px; }
-    
-    .hidden { display: none !important; }
-  </style>
+    <title>Duck Tournament Anti-Cheat Analyzer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: #0f3460;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+            color: white;
+            border: 1px solid #00d4ff;
+        }
+        h1 { 
+            color: #00d4ff; 
+            margin-bottom: 5px;
+            font-size: 36px;
+            text-shadow: 0 0 10px rgba(0,212,255,0.3);
+        }
+        .subtitle { 
+            color: #a0aec0; 
+            margin-bottom: 30px;
+            font-size: 14px;
+            border-bottom: 1px solid #2d3748;
+            padding-bottom: 10px;
+        }
+        
+        .tournament-banner {
+            background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+            color: #0a0a0f;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 18px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 1px solid #f59e0b;
+        }
+        
+        .server-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+            margin: 25px 0;
+        }
+        
+        .server-group {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #00d4ff;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
+        }
+        
+        .group-title {
+            font-size: 22px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #00d4ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #00d4ff;
+            font-weight: bold;
+        }
+        
+        .group-title .flag {
+            font-size: 28px;
+        }
+        
+        .server-card {
+            background: #0f3460;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 12px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .server-card:hover {
+            transform: translateX(8px);
+            border-color: #00d4ff;
+            background: #16213e;
+            box-shadow: 0 8px 12px rgba(0,212,255,0.2);
+        }
+        
+        .server-card.selected {
+            border-color: #4ade80;
+            background: #14532d;
+        }
+        
+        .server-port {
+            font-weight: bold;
+            font-size: 18px;
+            color: #00d4ff;
+        }
+        
+        .server-ping {
+            background: #1a1a2e;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #4ade80;
+            font-weight: bold;
+        }
+        
+        .server-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 12px;
+            box-shadow: 0 0 8px currentColor;
+        }
+        
+        .status-online { 
+            background: #4ade80; 
+            color: #4ade80;
+            box-shadow: 0 0 12px #4ade80;
+        }
+        
+        .spectator-controls {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            border: 1px solid #00d4ff;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 70px;
+            height: 36px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4b5563;
+            transition: .4s;
+            border-radius: 36px;
+            border: 2px solid #00d4ff;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 28px;
+            width: 28px;
+            left: 3px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: #00d4ff;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(34px);
+        }
+        
+        .connection-panel {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid #00d4ff;
+        }
+        
+        .password-input {
+            background: #0f3460;
+            border: 2px solid #00d4ff;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 16px;
+        }
+        
+        .password-input::placeholder {
+            color: #6b7280;
+        }
+        
+        .password-input:focus {
+            outline: none;
+            border-color: #4ade80;
+            box-shadow: 0 0 15px rgba(74,222,128,0.3);
+        }
+        
+        .log-panel {
+            background: #0a0a0f;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            border: 1px solid #00d4ff;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            color: #00d4ff;
+            font-weight: bold;
+        }
+        
+        .log-content {
+            background: #000000;
+            padding: 15px;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            color: #4ade80;
+            font-size: 12px;
+            line-height: 1.4;
+            border: 1px solid #2d3748;
+        }
+        
+        .log-entry {
+            margin: 2px 0;
+            border-bottom: 1px solid #1a1a2e;
+            padding-bottom: 2px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .log-time {
+            color: #00d4ff;
+            margin-right: 10px;
+        }
+        
+        .log-info { color: #4ade80; }
+        .log-warning { color: #fbbf24; }
+        .log-error { color: #ef4444; }
+        .log-success { color: #4ade80; font-weight: bold; }
+        .log-movement { color: #3b82f6; }
+        .log-player { color: #a855f7; }
+        .log-goal { color: #fbbf24; font-weight: bold; }
+        .log-state { color: #00d4ff; font-weight: bold; }
+        
+        .game-view {
+            background: #1a1a2e;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 1px solid #00d4ff;
+        }
+        
+        .game-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat-box {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #2d3748;
+        }
+        
+        .stat-box.red { background: #7f1d1d; border-color: #ef4444; }
+        .stat-box.blue { background: #1e3a8a; border-color: #00d4ff; }
+        .stat-box.state { background: #4a235a; border-color: #00d4ff; }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #a0aec0;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-value {
+            font-size: 42px;
+            font-weight: bold;
+            line-height: 1;
+        }
+        
+        #gameCanvas {
+            width: 100%;
+            height: 500px;
+            background: #0a0a0f;
+            border-radius: 10px;
+            border: 2px solid #00d4ff;
+            box-shadow: 0 0 20px rgba(0,212,255,0.2);
+        }
+        
+        .players-panel {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            border: 1px solid #00d4ff;
+        }
+        
+        .player-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+            border: 1px solid #2d3748;
+            border-radius: 5px;
+        }
+        
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid #0f3460;
+            transition: background 0.3s;
+            font-size: 14px;
+        }
+        
+        .player-item:hover {
+            background: #0f3460;
+        }
+        
+        .player-item.suspicious {
+            background: #7f1d1d;
+            border-left: 4px solid #ef4444;
+        }
+        
+        .team-red { color: #ef4444; font-weight: bold; }
+        .team-blue { color: #00d4ff; font-weight: bold; }
+        .team-spectator { color: #a855f7; font-weight: bold; }
+        
+        .detection-card {
+            background: #7f1d1d;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            border-left: 6px solid #ef4444;
+            border: 1px solid #ef4444;
+            box-shadow: 0 4px 6px rgba(239,68,68,0.2);
+        }
+        
+        button {
+            background: #00d4ff;
+            color: #000;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+            border: 1px solid transparent;
+        }
+        
+        button:hover {
+            background: #00a0cc;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0,212,255,0.3);
+            border-color: #4ade80;
+        }
+        
+        button:disabled {
+            background: #4b5563;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            border-color: transparent;
+        }
+        
+        button.secondary {
+            background: #4b5563;
+            color: white;
+        }
+        
+        button.secondary:hover {
+            background: #6b7280;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .selected-info {
+            background: #1a1a2e;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 6px solid #00d4ff;
+            border: 1px solid #00d4ff;
+        }
+        
+        .connection-status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-weight: bold;
+            text-align: center;
+            font-size: 16px;
+            border: 1px solid;
+        }
+        
+        .status-connected { 
+            background: #14532d; 
+            color: #4ade80; 
+            border-color: #4ade80;
+            box-shadow: 0 0 15px rgba(74,222,128,0.3);
+        }
+        .status-connecting { 
+            background: #92400e; 
+            color: #fbbf24; 
+            border-color: #fbbf24;
+            box-shadow: 0 0 15px rgba(251,191,36,0.3);
+        }
+        .status-error { 
+            background: #7f1d1d; 
+            color: #ef4444; 
+            border-color: #ef4444;
+            box-shadow: 0 0 15px rgba(239,68,68,0.3);
+        }
+        
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 13px;
+            border-top: 1px solid #2d3748;
+            padding-top: 20px;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .badge-cheater {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .badge-clean {
+            background: #4ade80;
+            color: black;
+        }
+    </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo">
-      <span class="duck">DUCK</span>
-      <span class="mod">ANALYZER</span>
-    </div>
-    <div>
-      <button class="btn small" id="showSavedBtn">📁 Saved Games</button>
-      <button class="btn small" id="clearSavedBtn">🗑 Clear</button>
-    </div>
-  </div>
-  
-  <div class="main-grid">
-    <!-- LEFT PANEL - Server Selection -->
-    <div class="server-panel">
-      <div class="panel-header">
-        <span>🔌 TOURNAMENT SERVERS</span>
-        <span id="connectionStatus" class="status-dot disconnected"></span>
-      </div>
-      <div class="panel-content">
-        <div class="server-group">
-          <div class="group-title">🇺🇸 NEW YORK</div>
-          <div id="ny-servers"></div>
+    <div class="container">
+        <h1>🦆 DUCK TOURNAMENT ANALYZER v23.0</h1>
+        <div class="subtitle">Professional Grade • Duck Mod Packet Parsing • Auto-Spectator • Full Recording</div>
+        
+        <div class="tournament-banner">
+            ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
         </div>
         
-        <div class="server-group">
-          <div class="group-title">🇩🇪 FRANKFURT</div>
-          <div id="fra-servers"></div>
-        </div>
-        
-        <input type="password" id="passwordInput" class="password-input" placeholder="Server password" value="rodshot">
-        
-        <button class="connect-btn" id="connectBtn" disabled>🚀 CONNECT TO SERVER</button>
-        <button class="connect-btn" id="disconnectBtn" style="background: #ff4466; color: white;" disabled>🔌 DISCONNECT</button>
-        
-        <div class="status-indicator">
-          <span id="statusDot" class="status-dot disconnected"></span>
-          <span id="statusText">Not connected</span>
-        </div>
-        
-        <div style="margin-top: 15px;">
-          <div class="tabs">
-            <div class="tab active" data-tab="live">LIVE</div>
-            <div class="tab" data-tab="players">PLAYERS</div>
-            <div class="tab" data-tab="saved">SAVED</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- RIGHT PANEL - Live View -->
-    <div class="live-panel">
-      <div class="panel-header">
-        <span>📺 LIVE SPECTATOR</span>
-        <span id="matchTime">0:00</span>
-      </div>
-      
-      <!-- LIVE TAB -->
-      <div id="liveTab" class="tab-pane">
-        <div class="field-container">
-          <canvas id="liveCanvas" width="450" height="650"></canvas>
-        </div>
-        
-        <div class="stats-row">
-          <span>Players: <span id="playerCount">0</span></span>
-          <span>My ID: <span id="myId">-</span></span>
-        </div>
-        
-        <div class="player-list" id="playerList"></div>
-      </div>
-      
-      <!-- PLAYERS TAB -->
-      <div id="playersTab" class="tab-pane hidden">
-        <div style="padding: 16px;">
-          <div style="margin-bottom: 10px;">
-            <button class="btn small" id="manualSpectatorBtn">👁️ Go Spectator</button>
-            <button class="btn small" id="startRecordBtn">⏺ Record</button>
-          </div>
-          <div id="detailedPlayerList"></div>
-        </div>
-      </div>
-      
-      <!-- SAVED TAB -->
-      <div id="savedTab" class="tab-pane hidden">
-        <div style="padding: 16px;">
-          <div id="savedGamesList" class="saved-games"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ==================== CONSTANTS ====================
-    const FIELD = {
-      minX: -15, maxX: 30,
-      minZ: -25, maxZ: 40,
-      centerX: 7.5, centerZ: 7.5
-    };
-    
-    const SERVERS = {
-      ny: [
-        { name: 'NY-8086', url: 'wss://community-01.usemapsettings.com:8086/server', password: 'rodshot' },
-        { name: 'NY-8087', url: 'wss://community-01.usemapsettings.com:8087/server', password: 'rodshot' },
-        { name: 'NY-8088', url: 'wss://community-01.usemapsettings.com:8088/server', password: 'rodshot' },
-        { name: 'NY-8089', url: 'wss://community-01.usemapsettings.com:8089/server', password: 'rodshot' }
-      ],
-      fra: [
-        { name: 'FRA-8086', url: 'wss://community-02.usemapsettings.com:8086/server', password: 'rodshot' },
-        { name: 'FRA-8087', url: 'wss://community-02.usemapsettings.com:8087/server', password: 'rodshot' },
-        { name: 'FRA-8088', url: 'wss://community-02.usemapsettings.com:8088/server', password: 'rodshot' },
-        { name: 'FRA-8089', url: 'wss://community-02.usemapsettings.com:8089/server', password: 'rodshot' }
-      ]
-    };
-    
-    // ==================== STATE ====================
-    let ws = null;
-    let selectedServer = null;
-    let playerId = null;
-    let myName = null;
-    
-    const state = {
-      players: {},
-      entityMap: {},
-      positions: {},
-      ballEntityId: null,
-      matchTime: 0,
-      recording: false,
-      matchData: { startTime: null, samples: [], goals: [] }
-    };
-    
-    let afkInterval = null;
-    let recordingInterval = null;
-    
-    // ==================== VARINT FUNCTIONS ====================
-    const w7bit = num => {
-      let r = [];
-      while (num >= 128) {
-        r.push((128 | num) % 256);
-        num >>= 7;
-      }
-      r.push(num % 256);
-      return r;
-    };
-    
-    const readVarInt = (arr, start) => {
-      let result = 0, shift = 0, pos = start;
-      while (pos < arr.length && shift < 35) {
-        const byte = arr[pos++];
-        result |= (byte & 0x7f) << shift;
-        if ((byte & 0x80) === 0) break;
-        shift += 7;
-      }
-      return [result, pos];
-    };
-    
-    const readFloat32 = (arr, start) => {
-      if (start + 4 > arr.length) return [0, start + 4];
-      const buffer = new Uint8Array(arr.slice(start, start + 4)).buffer;
-      return [new Float32Array(buffer)[0], start + 4];
-    };
-    
-    const readString = (arr, start) => {
-      const [len, dataStart] = readVarInt(arr, start);
-      if (len <= 0 || len > 50 || dataStart + len > arr.length) return ["", start];
-      try {
-        const str = new TextDecoder().decode(new Uint8Array(arr.slice(dataStart, dataStart + len)));
-        return [str, dataStart + len];
-      } catch { return ["", start]; }
-    };
-    
-    // ==================== PACKET BUILDERS ====================
-    function createAuthPacket(username, uid, password) {
-      const usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
-      const uidBytes = Array.from(uid).map(c => c.charCodeAt(0));
-      const pwdBytes = Array.from(password).map(c => c.charCodeAt(0));
-      const teamBytes = w7bit(2); // spectator
-      
-      const dataBytes = [
-        0x0a, usernameBytes.length, ...usernameBytes,
-        0x12, uidBytes.length, ...uidBytes,
-        0x18, 0xe6, 0x06,
-        0x20, ...teamBytes,
-        0x2a, pwdBytes.length, ...pwdBytes,
-        0x38, 0x01
-      ];
-      
-      const header = [0x08, 0x01, 0x12, dataBytes.length];
-      return new Uint8Array([...header, ...dataBytes]);
-    }
-    
-    function createAFKPacket(playerId) {
-      const idBytes = w7bit(playerId);
-      return new Uint8Array([
-        0x08, 0x07, 0x12, 0x0a,
-        0x08, 0x01,
-        0x12, 0x06,
-        0x0d, 0x00, 0x00, 0x00, 0x00,
-        0x15, 0x00, 0x00, 0x00, 0x00,
-        0x18, ...idBytes
-      ]);
-    }
-    
-    function createSpectatorPacket(playerId) {
-      const msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
-      const idBytes = w7bit(playerId);
-      
-      const innerPacket = [
-        0x08, 0x05, 0x12, 0x0c,
-        0x08, ...idBytes,
-        0x12, msgBytes.length, ...msgBytes
-      ];
-      
-      const lenBytes = w7bit(innerPacket.length);
-      return new Uint8Array([0x0a, ...lenBytes, ...innerPacket]);
-    }
-
-    function autoSpectatorWhenReady() {
-  const check = setInterval(() => {
-    if (ws && ws.readyState === WebSocket.OPEN && playerId) {
-      ws.send(createSpectatorPacket(playerId));
-      console.log('[SPECTATOR] Auto spectator sent for player', playerId);
-      clearInterval(check);
-    }
-  }, 500);
-}
-    // ==================== PACKET PARSING ====================
-    function parseMessage(data) {
-      if (data.length < 5 || data[0] !== 10) return;
-      
-      const [, afterLen] = readVarInt(data, 1);
-      if (data[afterLen] !== 8) return;
-      
-      const [code] = readVarInt(data, afterLen + 1);
-      
-      switch (code) {
-        case 2: case 3: case 8: case 13: case 15:
-          parsePlayerList(data);
-          parseEntityMappings(data);
-          break;
-        case 6:
-          parsePositions(data);
-          break;
-        case 11:
-          parseGoal(data);
-          break;
-        case 12:
-          parseGameState(data);
-          break;
-      }
-      
-      updateLiveView();
-    }
-    
-    function parsePlayerList(arr) {
-      let currentId = null, currentName = null, currentTeam = 0;
-      
-      for (let i = 0; i < arr.length - 2; i++) {
-        if (arr[i] === 8) {
-          const [val, nextPos] = readVarInt(arr, i + 1);
-          if (val >= 100 && val < 15000) {
-            // Check if this is a player (has name nearby)
-            for (let j = nextPos; j < Math.min(nextPos + 5, arr.length); j++) {
-              if (arr[j] === 18) {
-                const [strLen] = readVarInt(arr, j + 1);
-                if (strLen >= 2 && strLen <= 20) {
-                  if (currentId !== null && currentName !== null) {
-                    state.players[currentId] = { name: currentName, team: currentTeam };
-                  }
-                  currentId = val;
-                  currentName = null;
-                  currentTeam = 0;
-                  break;
-                }
-              }
-            }
-          }
-        }
-        
-        if (arr[i] === 18 && currentId !== null && currentName === null) {
-          const [str] = readString(arr, i + 1);
-          if (str.length >= 2 && str.length <= 20 && !/^[a-f0-9]{8}-/i.test(str)) {
-            currentName = str;
-            // Check if this is us
-            if (!myName) {
-              myName = str;
-              playerId = currentId;
-              document.getElementById('myId').textContent = playerId;
-            }
-          }
-        }
-        
-        if (arr[i] === 40 && currentId !== null) {
-          const [val] = readVarInt(arr, i + 1);
-          if (val === 1) currentTeam = 1;
-        }
-      }
-      
-      if (currentId !== null && currentName !== null) {
-        state.players[currentId] = { name: currentName, team: currentTeam };
-      }
-    }
-    
-    function parseEntityMappings(arr) {
-      const knownIds = new Set(Object.keys(state.players).map(Number));
-      
-      for (let i = 0; i < arr.length - 10; i++) {
-        if (arr[i] === 10) {
-          const [blockLen, afterBlock] = readVarInt(arr, i + 1);
-          if (blockLen >= 20 && blockLen <= 100 && arr[afterBlock] === 8) {
-            const [entityId, afterEntity] = readVarInt(arr, afterBlock + 1);
-            if (entityId > 1000 && entityId < 10000000 && !state.entityMap[entityId]) {
-              const blockEnd = Math.min(i + blockLen + 5, arr.length - 2);
-              for (let j = afterEntity; j < blockEnd; j++) {
-                if (arr[j] === 24) {
-                  const [constId] = readVarInt(arr, j + 1);
-                  if (knownIds.has(constId)) {
-                    state.entityMap[entityId] = constId;
-                    break;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    function parsePositions(arr) {
-      const now = Date.now();
-      for (let i = 0; i < arr.length - 15; i++) {
-        if (arr[i] === 18 && arr[i + 2] === 8) {
-          const sublen = arr[i + 1];
-          if (sublen >= 10 && sublen <= 50) {
-            const [entityId, nextPos] = readVarInt(arr, i + 3);
-            
-            if (entityId > 100 && entityId < 1000000) {
-              for (let j = nextPos; j < Math.min(nextPos + 20, arr.length - 10); j++) {
-                if (arr[j] === 18 && arr[j + 1] === 10 && arr[j + 2] === 13) {
-                  const [x] = readFloat32(arr, j + 3);
-                  if (arr[j + 7] === 21) {
-                    const [z] = readFloat32(arr, j + 8);
-                    
-                    if (Math.abs(x) < 500 && Math.abs(z) < 500) {
-                      const prev = state.positions[entityId];
-                      state.positions[entityId] = {
-                        x, z,
-                        prevX: prev?.x ?? x,
-                        prevZ: prev?.z ?? z,
-                        lastUpdate: now
-                      };
-                      
-                      if (!state.entityMap[entityId]) {
-                        if (state.ballEntityId === null || entityId > state.ballEntityId) {
-                          state.ballEntityId = entityId;
-                        }
-                      }
-                    }
-                  }
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    function parseGameState(arr) {
-      for (let i = 0; i < arr.length - 4; i++) {
-        if (arr[i] === 13) {
-          const [time] = readFloat32(arr, i + 1);
-          if (time >= 0 && time <= 600) {
-            state.matchTime = time;
-            const mins = Math.floor(time / 60);
-            const secs = Math.floor(time % 60);
-            document.getElementById('matchTime').textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
-          }
-          break;
-        }
-      }
-    }
-    
-    function parseGoal(arr) {
-      const now = Date.now();
-      let scorer = null, team = null;
-      
-      for (let i = 0; i < arr.length - 3; i++) {
-        if (arr[i] === 8) {
-          const [val] = readVarInt(arr, i + 1);
-          if (val >= 100 && val < 15000) {
-            const player = state.players[val];
-            if (player) {
-              scorer = player.name;
-              team = player.team === 1 ? 'blue' : 'red';
-              break;
-            }
-          }
-        }
-      }
-      
-      if (state.recording && state.matchData.startTime) {
-        state.matchData.goals.push({
-          t: now - state.matchData.startTime,
-          matchTime: state.matchTime,
-          scorer,
-          team
-        });
-      }
-      
-      // Show goal alert
-      showGoalAlert({ scorer, team });
-    }
-    
-    // ==================== LIVE VIEW RENDERING ====================
-    function updateLiveView() {
-      document.getElementById('playerCount').textContent = Object.keys(state.players).length;
-      
-      // Update player list
-      const playerList = document.getElementById('playerList');
-      let html = '';
-      
-      Object.entries(state.players).forEach(([id, p]) => {
-        let pos = null;
-        for (const [eId, data] of Object.entries(state.positions)) {
-          if (state.entityMap[eId] == id) {
-            pos = data;
-            break;
-          }
-        }
-        
-        html += `
-          <div class="player-item">
-            <div class="player-dot ${p.team === 1 ? 'blue' : 'red'}"></div>
-            <span class="player-name">${p.name}${id == playerId ? ' (you)' : ''}</span>
-            <span class="player-position">${pos ? `${pos.x.toFixed(1)}, ${pos.z.toFixed(1)}` : ''}</span>
-          </div>
-        `;
-      });
-      
-      playerList.innerHTML = html || '<div style="color:#555;">No players yet</div>';
-      
-      // Update detailed player list
-      const detailedList = document.getElementById('detailedPlayerList');
-      let detailedHtml = '<div style="margin-bottom:10px;"><strong>Blue Team</strong></div>';
-      
-      Object.entries(state.players).filter(([_, p]) => p.team === 1).forEach(([id, p]) => {
-        detailedHtml += `<div style="color:#00d4ff; padding:2px 0;">${p.name}</div>`;
-      });
-      
-      detailedHtml += '<div style="margin:10px 0 5px;"><strong>Red Team</strong></div>';
-      Object.entries(state.players).filter(([_, p]) => p.team === 0).forEach(([id, p]) => {
-        detailedHtml += `<div style="color:#ff4466; padding:2px 0;">${p.name}</div>`;
-      });
-      
-      detailedList.innerHTML = detailedHtml;
-      
-
-    }
-    
-    function renderCanvas() {
-      const canvas = document.getElementById('liveCanvas');
-      const ctx = canvas.getContext('2d');
-      const w = canvas.width, h = canvas.height;
-      
-      ctx.clearRect(0, 0, w, h);
-      
-      // Draw field
-      ctx.fillStyle = '#1e4d2b';
-      ctx.fillRect(0, 0, w, h);
-      
-      // Center line
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, h/2);
-      ctx.lineTo(w, h/2);
-      ctx.stroke();
-      
-      // Center circle
-      ctx.beginPath();
-      ctx.arc(w/2, h/2, 40, 0, Math.PI*2);
-      ctx.stroke();
-      
-      // Goals
-      ctx.strokeStyle = '#00d4ff';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(w*0.35, h-1);
-      ctx.lineTo(w*0.65, h-1);
-      ctx.stroke();
-      
-      ctx.strokeStyle = '#ff4466';
-      ctx.beginPath();
-      ctx.moveTo(w*0.35, 1);
-      ctx.lineTo(w*0.65, 1);
-      ctx.stroke();
-      
-      // Scale
-      const scaleX = x => ((x - FIELD.minX) / (FIELD.maxX - FIELD.minX)) * w;
-      const scaleZ = z => h - ((z - FIELD.minZ) / (FIELD.maxZ - FIELD.minZ)) * h;
-      
-      // Draw ball
-      if (state.ballEntityId && state.positions[state.ballEntityId]) {
-        const ball = state.positions[state.ballEntityId];
-        const bx = scaleX(ball.x);
-        const bz = scaleZ(ball.z);
-        
-        ctx.shadowColor = '#fff';
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.arc(bx, bz, 6, 0, Math.PI*2);
-        ctx.fillStyle = '#fff';
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
-      
-      // Draw players
-      Object.entries(state.positions).forEach(([entityId, pos]) => {
-        const constId = state.entityMap[entityId];
-        if (!constId || constId === state.ballEntityId) return;
-        
-        const player = state.players[constId];
-        if (!player) return;
-        
-        const px = scaleX(pos.x);
-        const pz = scaleZ(pos.z);
-        const color = player.team === 1 ? '#00d4ff' : '#ff4466';
-        
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.arc(px, pz, 8, 0, Math.PI*2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        
-        // Name
-        ctx.font = 'bold 8px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#fff';
-        ctx.shadowColor = '#000';
-        ctx.shadowBlur = 3;
-        ctx.fillText(player.name.slice(0, 6), px, pz - 15);
-        ctx.shadowBlur = 0;
-      });
-      
-      requestAnimationFrame(renderCanvas);
-    }
-    
-    function showGoalAlert(goal) {
-      const alert = document.createElement('div');
-      alert.style.cssText = `
-        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        background: rgba(0,0,0,0.9); padding: 30px 60px; border-radius: 12px;
-        text-align: center; z-index: 1000; border: 2px solid ${goal.team === 'blue' ? '#00d4ff' : '#ff4466'};
-        color: ${goal.team === 'blue' ? '#00d4ff' : '#ff4466'}; font-size: 48px; font-weight: bold;
-      `;
-      alert.innerHTML = `GOAL!<br><span style="font-size:24px;">${goal.scorer || 'Someone'}</span>`;
-      document.body.appendChild(alert);
-      setTimeout(() => alert.remove(), 2000);
-    }
-    
-    // ==================== CONNECTION ====================
-    function connectToServer(server) {
-  if (ws) ws.close();
-  
-  playerId = null;
-  myName = null;
-  state.players = {};
-  state.entityMap = {};
-  state.positions = {};
-  state.ballEntityId = null;
-  
-  updateStatus('connecting', 'Connecting...');
-  
-  try {
-    ws = new WebSocket(server.url);
-    ws.binaryType = 'arraybuffer';
-    
-    // ---- OPEN ----
-    ws.onopen = () => {
-      updateStatus('connected', `Connected to ${server.name}`);
-      
-      const username = `Duck_${Math.floor(Math.random() * 1000)}`;
-      const uid = Array(28).fill().map(() => 
-        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 62)]
-      ).join('');
-      
-      const authPacket = createAuthPacket(
-        username,
-        uid,
-        document.getElementById('passwordInput').value || 'rodshot'
-      );
-      
-      ws.send(authPacket);
-      autoSpectatorWhenReady();
-
-      // Safe heartbeat (prevents disconnect without movement spam)
-      if (afkInterval) clearInterval(afkInterval);
-      afkInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN && playerId) {
-          ws.send(createAFKPacket(playerId));
-        }
-      }, 10000);
-    };
-    
-    // ---- MESSAGE ----
-    ws.onmessage = (event) => {
-      const data = new Uint8Array(event.data);
-      parseMessage(data);
-    };
-    
-    // ---- CLOSE ----
-    ws.onclose = () => {
-      updateStatus('disconnected', 'Disconnected');
-      if (afkInterval) {
-        clearInterval(afkInterval);
-        afkInterval = null;
-      }
-    };
-    
-    // ---- ERROR ----
-    ws.onerror = () => {
-      updateStatus('disconnected', 'Connection error');
-    };
-    
-  } catch (e) {
-    updateStatus('disconnected', 'Connection failed');
-  }
-}
-    
-    // ==================== RECORDING ====================
-    function startRecording() {
-      state.recording = true;
-      state.matchData = { startTime: Date.now(), samples: [], goals: [] };
-      recordingInterval = setInterval(captureSample, 200);
-      document.getElementById('startRecordBtn').textContent = '⏹ Stop';
-    }
-    
-    function stopRecording() {
-      state.recording = false;
-      if (recordingInterval) {
-        clearInterval(recordingInterval);
-        recordingInterval = null;
-      }
-      saveMatch();
-      document.getElementById('startRecordBtn').textContent = '⏺ Record';
-    }
-    
-    function captureSample() {
-      if (!state.recording) return;
-      
-      const now = Date.now();
-      const t = now - state.matchData.startTime;
-      
-      const ball = state.ballEntityId && state.positions[state.ballEntityId] ? {
-        x: state.positions[state.ballEntityId].x,
-        z: state.positions[state.ballEntityId].z
-      } : null;
-      
-      const players = [];
-      Object.entries(state.positions).forEach(([entityId, pos]) => {
-        const constId = state.entityMap[entityId];
-        if (!constId || constId === state.ballEntityId) return;
-        
-        const player = state.players[constId];
-        if (!player) return;
-        
-        players.push({
-          name: player.name,
-          team: player.team === 1 ? 'blue' : 'red',
-          x: pos.x,
-          z: pos.z
-        });
-      });
-      
-      state.matchData.samples.push({ t, ball, players });
-    }
-    
-    function saveMatch() {
-      const exportData = {
-        recorded: new Date(state.matchData.startTime).toISOString(),
-        duration: Date.now() - state.matchData.startTime,
-        players: state.players,
-        goals: state.matchData.goals,
-        samples: state.matchData.samples
-      };
-      
-      const saved = JSON.parse(localStorage.getItem('duck-saved-games') || '[]');
-      saved.push({
-        id: Date.now(),
-        name: `Match ${new Date().toLocaleString()}`,
-        data: exportData
-      });
-      localStorage.setItem('duck-saved-games', JSON.stringify(saved));
-      
-      updateSavedGames();
-    }
-    
-    function updateSavedGames() {
-      const saved = JSON.parse(localStorage.getItem('duck-saved-games') || '[]');
-      const container = document.getElementById('savedGamesList');
-      
-      if (saved.length === 0) {
-        container.innerHTML = '<div style="color:#555;">No saved games</div>';
-        return;
-      }
-      
-      container.innerHTML = saved.reverse().map(game => {
-        const blueGoals = game.data.goals?.filter(g => g.team === 'blue').length || 0;
-        const redGoals = game.data.goals?.filter(g => g.team === 'red').length || 0;
-        
-        return `
-          <div class="game-card" onclick="viewGame('${game.id}')">
-            <div class="game-date">${new Date(game.data.recorded).toLocaleString()}</div>
-            <div class="game-score">
-              <span style="color:#00d4ff;">${blueGoals}</span>
-              <span>-</span>
-              <span style="color:#ff4466;">${redGoals}</span>
+        <!-- Spectator Controls -->
+        <div class="spectator-controls">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <span style="font-size: 18px;">👁️ AUTO-SPECTATOR:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="autoSpectator" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <span style="color: #4ade80;" id="spectatorStatus">Ready</span>
             </div>
-            <div style="color:#888;">${Object.keys(game.data.players).length} players</div>
-          </div>
-        `;
-      }).join('');
-    }
-    
-    window.viewGame = function(id) {
-      const saved = JSON.parse(localStorage.getItem('duck-saved-games') || '[]');
-      const game = saved.find(g => g.id == id);
-      if (game) {
-        const win = window.open('');
-        win.document.write(createReplayHTML(game.data));
-      }
-    };
-    
-    function createReplayHTML(data) {
-      return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Match Replay</title>
-          <style>
-            body { background: #0d0d1a; color: #fff; font-family: Arial; margin:0; padding:20px; }
-            canvas { display:block; margin:0 auto; border:2px solid #00d4ff; border-radius:8px; }
-            .controls { text-align:center; margin-top:20px; }
-            button { background:#00d4ff; border:none; padding:10px 20px; margin:0 5px; cursor:pointer; }
-          </style>
-        </head>
-        <body>
-          <canvas id="replayCanvas" width="450" height="650"></canvas>
-          <div class="controls">
-            <button onclick="play()">▶ Play</button>
-            <button onclick="pause()">⏸ Pause</button>
-            <span id="time">0:00</span>
-          </div>
-          <script>
-            const gameData = ${JSON.stringify(data)};
-            const canvas = document.getElementById('replayCanvas');
+            <div style="display: flex; gap: 10px;">
+                <button onclick="manualSpectator()" id="manualSpectator" class="secondary">👁️ GO SPECTATOR</button>
+                <button onclick="toggleAFKPrevention()" id="afkToggle" class="secondary">⏱️ AFK: ON</button>
+                <button onclick="toggleRecording()" id="recordToggle" class="secondary">⏺ RECORD: OFF</button>
+            </div>
+        </div>
+        
+        <!-- Server Grid -->
+        <div class="server-grid">
+            <!-- New York -->
+            <div class="server-group">
+                <div class="group-title">
+                    <span>🗽 NEW YORK TOURNAMENT</span>
+                    <span class="flag">🇺🇸</span>
+                </div>
+                <div id="ny-servers"></div>
+            </div>
+            
+            <!-- Frankfurt -->
+            <div class="server-group">
+                <div class="group-title">
+                    <span>🇪🇺 FRANKFURT TOURNAMENT</span>
+                    <span class="flag">🇩🇪</span>
+                </div>
+                <div id="fra-servers"></div>
+            </div>
+        </div>
+        
+        <!-- Connection Panel -->
+        <div class="connection-panel">
+            <h3 style="color: #00d4ff; margin-bottom: 20px;">🔐 TOURNAMENT CONNECTION</h3>
+            
+            <div class="selected-info" id="selectedServer">
+                <strong>NO SERVER SELECTED</strong><br>
+                <span style="color: #a0aec0; font-size: 13px;">Click on a server card above</span>
+            </div>
+            
+            <div style="margin: 20px 0;">
+                <label style="display: block; margin-bottom: 8px; color: #00d4ff;">TOURNAMENT PASSWORD:</label>
+                <input type="password" id="serverPassword" class="password-input" placeholder="Enter server password" value="rodshot" autocomplete="off">
+                <div style="color: #fbbf24; font-size: 12px; margin-top: 5px;">
+                    ⚠️ Tournament password is: rodshot (can be changed)
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button onclick="connectToSelected()" id="connectBtn" disabled>🚀 CONNECT TO SERVER</button>
+                <button onclick="disconnect()" id="disconnectBtn" class="secondary" disabled>🔌 DISCONNECT</button>
+                <button onclick="clearLogs()" id="clearLogsBtn" class="secondary">🗑 CLEAR LOGS</button>
+                <button onclick="exportRecording()" id="exportBtn" class="secondary">💾 SAVE RECORDING</button>
+            </div>
+            
+            <div id="connectionStatus" class="connection-status" style="display: none;"></div>
+        </div>
+        
+        <!-- Live Packet Log -->
+        <div class="log-panel">
+            <div class="log-header">
+                <span>📋 LIVE EVENT LOG</span>
+                <span id="logCount" style="color: #4ade80;">0 entries</span>
+            </div>
+            <div class="log-content" id="logContent">
+                <div class="log-entry"><span class="log-time">[SYSTEM]</span> <span class="log-info">Analyzer initialized. Select a server to begin.</span></div>
+            </div>
+        </div>
+        
+        <!-- Game View -->
+        <div id="gameView" style="display: none;">
+            <div class="game-view">
+                <h3 style="color: #00d4ff; margin-bottom: 20px;">📺 LIVE SPECTATOR VIEW</h3>
+                
+                <!-- Game Stats -->
+                <div class="game-stats">
+                    <div class="stat-box blue">
+                        <div class="stat-label">🔵 BLUE TEAM</div>
+                        <div class="stat-value" id="blueScore">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">⏱️ TIME</div>
+                        <div class="stat-value" id="gameTime">5:00</div>
+                    </div>
+                    <div class="stat-box red">
+                        <div class="stat-label">🔴 RED TEAM</div>
+                        <div class="stat-value" id="redScore">0</div>
+                    </div>
+                    <div class="stat-box state">
+                        <div class="stat-label">🎮 STATE</div>
+                        <div class="stat-value" id="gameState">0</div>
+                    </div>
+                </div>
+                
+                <!-- Game Canvas -->
+                <canvas id="gameCanvas" width="1200" height="600"></canvas>
+                
+                <!-- Recording Controls -->
+                <div class="button-group" style="margin-top: 20px;">
+                    <button onclick="startRecording()" id="recordBtn">⏺ START RECORDING</button>
+                    <button onclick="stopRecording()" id="stopBtn" class="secondary">⏹ STOP RECORDING</button>
+                    <span style="align-self: center; color: #4ade80; font-size: 24px; font-weight: bold; margin-left: 20px;" id="recordingTimer">00:00</span>
+                </div>
+            </div>
+            
+            <!-- Players Panel -->
+            <div class="players-panel">
+                <h3 style="color: #00d4ff; margin-bottom: 15px;">👥 ACTIVE PLAYERS <span id="playerCount"></span></h3>
+                <div class="player-list" id="playerList"></div>
+            </div>
+        </div>
+        
+        <!-- Detections Panel -->
+        <div style="margin-top: 30px;">
+            <h3 style="color: #00d4ff; margin-bottom: 20px;">🚨 AUTO-BACKBOOST DETECTIONS</h3>
+            <div class="button-group">
+                <button onclick="exportDetections()">📥 EXPORT CSV</button>
+                <button onclick="clearDetections()" class="secondary">🗑 CLEAR HISTORY</button>
+            </div>
+            <div id="detectionsList"></div>
+        </div>
+        
+        <div class="footer">
+            🦆 DUCK ANALYZER v23.0 • DUCK MOD PACKET PARSING • AUTO-SPECTATOR • FULL RECORDING • AFK PREVENTION<br>
+            Works standalone on GitHub Pages • Password: rodshot
+        </div>
+    </div>
+
+    <script>
+        // ==================== DUCK MOD PACKET PARSING ====================
+        const readVarInt = (arr, start) => {
+            let result = 0, shift = 0, pos = start;
+            while (pos < arr.length && shift < 35) {
+                const byte = arr[pos++];
+                result |= (byte & 0x7f) << shift;
+                if ((byte & 0x80) === 0) break;
+                shift += 7;
+            }
+            return [result, pos];
+        };
+
+        const readFloat32 = (arr, start) => {
+            if (start + 4 > arr.length) return [0, start + 4];
+            const buffer = new Uint8Array(arr.slice(start, start + 4)).buffer;
+            return [new Float32Array(buffer)[0], start + 4];
+        };
+
+        const readString = (arr, start) => {
+            if (start >= arr.length) return ["", start];
+            const [len, dataStart] = readVarInt(arr, start);
+            if (len <= 0 || len > 50 || dataStart + len > arr.length) return ["", start];
+            try {
+                const str = new TextDecoder().decode(new Uint8Array(arr.slice(dataStart, dataStart + len)));
+                if (/^[\x20-\x7E\u00A0-\uFFFF]+$/.test(str) && str.trim().length > 0) {
+                    return [str, dataStart + len];
+                }
+            } catch {}
+            return ["", start];
+        };
+
+        const w7bit = num => {
+            let r = [];
+            while (num >= 128) {
+                r.push((128 | num) % 256);
+                num >>= 7;
+            }
+            r.push(num % 256);
+            return r;
+        };
+
+        // ==================== TOURNAMENT SERVERS ====================
+        const TOURNAMENT_SERVERS = {
+            'ny': {
+                name: 'NEW YORK',
+                flag: '🇺🇸',
+                websockets: [
+                    'wss://community-01.usemapsettings.com:8086/server',
+                    'wss://community-01.usemapsettings.com:8087/server',
+                    'wss://community-01.usemapsettings.com:8088/server',
+                    'wss://community-01.usemapsettings.com:8089/server'
+                ],
+                displayNames: ['NY-8086', 'NY-8087', 'NY-8088', 'NY-8089']
+            },
+            'fra': {
+                name: 'FRANKFURT',
+                flag: '🇩🇪',
+                websockets: [
+                    'wss://community-02.usemapsettings.com:8086/server',
+                    'wss://community-02.usemapsettings.com:8087/server',
+                    'wss://community-02.usemapsettings.com:8088/server',
+                    'wss://community-02.usemapsettings.com:8089/server'
+                ],
+                displayNames: ['FRA-8086', 'FRA-8087', 'FRA-8088', 'FRA-8089']
+            }
+        };
+
+        // ==================== PACKET BUILDERS ====================
+        function createAuthPacket(username, uid, password) {
+            let usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
+            let uidBytes = Array.from(uid).map(c => c.charCodeAt(0));
+            let pwdBytes = Array.from(password).map(c => c.charCodeAt(0));
+            let teamBytes = w7bit(2); // spectator mode
+            
+            let dataBytes = [
+                0x0a, usernameBytes.length, ...usernameBytes,
+                0x12, uidBytes.length, ...uidBytes,
+                0x18, 0xe6, 0x06,
+                0x20, ...teamBytes,
+                0x2a, pwdBytes.length, ...pwdBytes,
+                0x38, 0x01
+            ];
+            
+            return new Uint8Array([0x08, 0x01, 0x12, dataBytes.length, ...dataBytes]);
+        }
+
+        function createAFKPacket(playerId) {
+            let idBytes = w7bit(playerId);
+            return new Uint8Array([
+                0x08, 0x07, 0x12, 0x0a,
+                0x08, 0x01,
+                0x12, 0x06,
+                0x0d, 0x00, 0x00, 0x00, 0x00,
+                0x15, 0x00, 0x00, 0x00, 0x00,
+                0x18, ...idBytes
+            ]);
+        }
+
+        // ==================== GAME STATE ====================
+        let ws = null;
+        let players = new Map();
+        let entityMap = new Map();
+        let ball = { x: 0, z: 0 };
+        let ballEntityId = null;
+        let gameState = {
+            timeRemaining: 300,
+            redScore: 0,
+            blueScore: 0,
+            gameState: 0
+        };
+        
+        let boostHistory = new Map();
+        let detections = JSON.parse(localStorage.getItem('duckDetections') || '[]');
+        let currentRecording = null;
+        let recordingStartTime = null;
+        let recordingInterval = null;
+        let selectedServer = null;
+        let logEntries = [];
+        let packetCount = 0;
+        let authenticated = false;
+        let afkInterval = null;
+        let afkEnabled = true;
+        let movementLogging = true;
+        let playerId = null;
+        let lastBoostTime = new Map();
+        let spectatorSent = false;
+        let timeInterval = null;
+        let recording = false;
+
+        // ==================== LOGGING ====================
+        function addLog(message, type = 'info') {
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            logEntries.push({ time, message, type });
+            
+            const logContent = document.getElementById('logContent');
+            const logCount = document.getElementById('logCount');
+            
+            if (logContent) {
+                const logClass = type === 'error' ? 'log-error' : 
+                                type === 'warning' ? 'log-warning' : 
+                                type === 'movement' ? 'log-movement' :
+                                type === 'player' ? 'log-player' :
+                                type === 'goal' ? 'log-goal' :
+                                type === 'state' ? 'log-state' :
+                                type === 'success' ? 'log-success' : 'log-info';
+                logContent.innerHTML += `<div class="log-entry"><span class="log-time">[${time}]</span> <span class="${logClass}">${message}</span></div>`;
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+            
+            if (logCount) logCount.innerText = `${logEntries.length} entries`;
+        }
+
+        function clearLogs() {
+            logEntries = [];
+            const logContent = document.getElementById('logContent');
+            if (logContent) logContent.innerHTML = '<div class="log-entry"><span class="log-time">[SYSTEM]</span> <span class="log-info">Logs cleared.</span></div>';
+            addLog('Logs cleared by user', 'warning');
+        }
+
+        // ==================== SERVER UI ====================
+        function initServers() {
+            addLog('Initializing tournament server list...', 'info');
+            
+            const nyDiv = document.getElementById('ny-servers');
+            if (nyDiv) {
+                nyDiv.innerHTML = '';
+                TOURNAMENT_SERVERS.ny.websockets.forEach((ws, index) => {
+                    nyDiv.innerHTML += `
+                        <div class="server-card" onclick="selectServer('ny', ${index})" id="ny-card-${index}">
+                            <div><span class="server-status status-online"></span><span class="server-port">${TOURNAMENT_SERVERS.ny.displayNames[index]}</span></div>
+                            <div><span class="server-ping">ready</span></div>
+                        </div>
+                    `;
+                });
+            }
+            
+            const fraDiv = document.getElementById('fra-servers');
+            if (fraDiv) {
+                fraDiv.innerHTML = '';
+                TOURNAMENT_SERVERS.fra.websockets.forEach((ws, index) => {
+                    fraDiv.innerHTML += `
+                        <div class="server-card" onclick="selectServer('fra', ${index})" id="fra-card-${index}">
+                            <div><span class="server-status status-online"></span><span class="server-port">${TOURNAMENT_SERVERS.fra.displayNames[index]}</span></div>
+                            <div><span class="server-ping">ready</span></div>
+                        </div>
+                    `;
+                });
+            }
+            
+            addLog('Server grid initialized', 'success');
+        }
+
+        function selectServer(region, index) {
+            document.querySelectorAll('.server-card').forEach(c => c.classList.remove('selected'));
+            const selectedCard = document.getElementById(`${region}-card-${index}`);
+            if (selectedCard) selectedCard.classList.add('selected');
+            
+            selectedServer = {
+                region: region,
+                index: index,
+                url: TOURNAMENT_SERVERS[region].websockets[index],
+                displayName: TOURNAMENT_SERVERS[region].displayNames[index],
+                fullName: `${TOURNAMENT_SERVERS[region].name} - ${TOURNAMENT_SERVERS[region].displayNames[index]}`
+            };
+            
+            document.getElementById('selectedServer').innerHTML = `
+                <strong style="color: #00d4ff;">SELECTED: ${selectedServer.fullName}</strong><br>
+                <span style="color: #a0aec0; font-size: 13px;">${selectedServer.url}</span>
+                <br><span style="color: #fbbf24; font-size: 12px;">⚠️ PASSWORD REQUIRED</span>
+            `;
+            
+            document.getElementById('connectBtn').disabled = false;
+            addLog(`[SERVER] Selected ${selectedServer.fullName}`, 'success');
+        }
+
+        // ==================== AUTH ====================
+        function generateUsername() {
+            return `Duck${Math.floor(Math.random() * 900) + 100}`;
+        }
+
+        function generateUID() {
+            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            return Array(28).fill().map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
+        }
+
+        function sendAuthentication(password) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addLog('[ERROR] Cannot authenticate - WebSocket not open', 'error');
+                return;
+            }
+            
+            addLog('[AUTH] Building authentication packet...', 'info');
+            
+            try {
+                const username = generateUsername();
+                const uid = generateUID();
+                
+                addLog(`[AUTH] Username: ${username}`, 'info');
+                const packet = createAuthPacket(username, uid, password);
+                ws.send(packet);
+                
+            } catch (e) {
+                addLog(`[ERROR] Authentication failed: ${e.message}`, 'error');
+            }
+        }
+
+        // ==================== PACKET PARSING ====================
+        function parseMessage(data) {
+            if (data.length < 5 || data[0] !== 10) return;
+            
+            const [, afterLen] = readVarInt(data, 1);
+            if (data[afterLen] !== 8) return;
+            
+            const [code] = readVarInt(data, afterLen + 1);
+            
+            switch (code) {
+                case 2: // Game state
+                case 3:
+                case 8:
+                case 13:
+                case 15:
+                    parsePlayerData(data);
+                    parseEntityMappings(data);
+                    break;
+                case 6:
+                    parsePositions(data);
+                    break;
+                case 11:
+                    parseGoal(data);
+                    break;
+                case 12:
+                    parseGameStateUpdate(data);
+                    break;
+            }
+        }
+
+        function parsePlayerData(arr) {
+            let currentId = null, currentName = null, currentTeam = 0;
+            
+            for (let i = 0; i < arr.length - 2; i++) {
+                if (arr[i] === 8) {
+                    const [val, nextPos] = readVarInt(arr, i + 1);
+                    if (val >= 100 && val < 15000) {
+                        let hasName = false;
+                        for (let j = nextPos; j < Math.min(nextPos + 5, arr.length); j++) {
+                            if (arr[j] === 18) {
+                                const [strLen] = readVarInt(arr, j + 1);
+                                if (strLen >= 2 && strLen <= 20) {
+                                    hasName = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (hasName) {
+                            if (currentId !== null && currentName !== null) {
+                                updatePlayer(currentId, currentName, currentTeam);
+                            }
+                            currentId = val;
+                            currentName = null;
+                            currentTeam = 0;
+                        }
+                    }
+                }
+                
+                if (arr[i] === 18 && currentId !== null && currentName === null) {
+                    const [str] = readString(arr, i + 1);
+                    if (str.length >= 2 && str.length <= 20 && !/^[a-f0-9]{8}-/i.test(str)) {
+                        currentName = str;
+                        if (!playerId && str.includes('Duck')) {
+                            playerId = currentId;
+                            addLog(`[AUTH] Player ID: ${playerId}`, 'success');
+                        }
+                    }
+                }
+                
+                if (arr[i] === 40 && currentId !== null) {
+                    const [val] = readVarInt(arr, i + 1);
+                    if (val === 1) currentTeam = 1;
+                }
+            }
+            
+            if (currentId !== null && currentName !== null) {
+                updatePlayer(currentId, currentName, currentTeam);
+            }
+        }
+
+        function updatePlayer(id, name, team) {
+            let player = players.get(id) || {
+                id, name, team,
+                boosts: [],
+                suspicious: false,
+                goals: 0,
+                assists: 0
+            };
+            player.name = name;
+            player.team = team;
+            players.set(id, player);
+            
+            if (movementLogging) {
+                let teamName = team === 1 ? '🔵' : '🔴';
+                addLog(`${teamName} ${name} joined`, 'player');
+            }
+        }
+
+        function parseEntityMappings(arr) {
+            const knownIds = new Set(Array.from(players.keys()).map(Number));
+            
+            for (let i = 0; i < arr.length - 10; i++) {
+                if (arr[i] === 10) {
+                    const [blockLen, afterBlock] = readVarInt(arr, i + 1);
+                    if (blockLen >= 20 && blockLen <= 100 && arr[afterBlock] === 8) {
+                        const [entityId, afterEntity] = readVarInt(arr, afterBlock + 1);
+                        if (entityId > 1000 && entityId < 10000000 && !entityMap.has(entityId)) {
+                            const blockEnd = Math.min(i + blockLen + 5, arr.length - 2);
+                            for (let j = afterEntity; j < blockEnd; j++) {
+                                if (arr[j] === 24) {
+                                    const [constId] = readVarInt(arr, j + 1);
+                                    if (knownIds.has(constId)) {
+                                        entityMap.set(entityId, constId);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function parsePositions(arr) {
+            for (let i = 0; i < arr.length - 15; i++) {
+                if (arr[i] === 18 && arr[i + 2] === 8) {
+                    const sublen = arr[i + 1];
+                    if (sublen >= 10 && sublen <= 50) {
+                        const [entityId, nextPos] = readVarInt(arr, i + 3);
+                        
+                        if (entityId > 100 && entityId < 1000000) {
+                            for (let j = nextPos; j < Math.min(nextPos + 20, arr.length - 10); j++) {
+                                if (arr[j] === 18 && arr[j + 1] === 10 && arr[j + 2] === 13) {
+                                    const [x] = readFloat32(arr, j + 3);
+                                    if (arr[j + 7] === 21) {
+                                        const [z] = readFloat32(arr, j + 8);
+                                        
+                                        if (Math.abs(x) < 500 && Math.abs(z) < 500) {
+                                            const constId = entityMap.get(entityId);
+                                            if (constId) {
+                                                let player = players.get(constId);
+                                                if (player) {
+                                                    player.x = x;
+                                                    player.z = z;
+                                                    players.set(constId, player);
+                                                }
+                                            } else if (entityId > 100000) {
+                                                ball = { x, z };
+                                                ballEntityId = entityId;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function parseGameStateUpdate(arr) {
+            for (let i = 0; i < arr.length - 4; i++) {
+                if (arr[i] === 13) {
+                    const [time] = readFloat32(arr, i + 1);
+                    if (time >= 0 && time <= 600) {
+                        gameState.timeRemaining = time;
+                        updateGameTime();
+                    }
+                    break;
+                }
+            }
+        }
+
+        function parseGoal(arr) {
+            const now = Date.now();
+            let scorer = null, team = null;
+            
+            for (let i = 0; i < arr.length - 3; i++) {
+                if (arr[i] === 8) {
+                    const [val] = readVarInt(arr, i + 1);
+                    if (val >= 100 && val < 15000) {
+                        const player = players.get(val);
+                        if (player) {
+                            scorer = player.name;
+                            team = player.team === 1 ? 'blue' : 'red';
+                            player.goals = (player.goals || 0) + 1;
+                            players.set(val, player);
+                            addLog(`⚽ GOAL! ${scorer} scored!`, 'goal');
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (recording && currentRecording) {
+                currentRecording.goals.push({
+                    t: Date.now() - recordingStartTime,
+                    scorer,
+                    team
+                });
+            }
+        }
+
+        // ==================== SPECTATOR ====================
+        function sendSpectatorCommand() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
+                return;
+            }
+            
+            if (!playerId) {
+                addLog('[ERROR] No player ID yet', 'error');
+                return;
+            }
+            
+            addLog(`[SPECTATOR] Switching to spectator mode...`, 'info');
+            
+            try {
+                const msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
+                const idBytes = w7bit(playerId);
+                
+                const innerPacket = [
+                    0x08, 0x05, 0x12, 0x0c,
+                    0x08, ...idBytes,
+                    0x12, msgBytes.length, ...msgBytes
+                ];
+                
+                const lenBytes = w7bit(innerPacket.length);
+                const packet = new Uint8Array([0x0a, ...lenBytes, ...innerPacket]);
+                
+                ws.send(packet);
+                addLog('[SPECTATOR] ✅ Spectator command sent', 'success');
+                
+            } catch (e) {
+                addLog(`[ERROR] Failed: ${e.message}`, 'error');
+            }
+        }
+
+        function manualSpectator() {
+            sendSpectatorCommand();
+        }
+
+        // ==================== AFK PREVENTION ====================
+        function startAFKPrevention() {
+            if (!afkEnabled || !playerId) return;
+            if (afkInterval) clearInterval(afkInterval);
+            
+            addLog(`[AFK] Starting AFK prevention`, 'info');
+            
+            afkInterval = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    const packet = createAFKPacket(playerId);
+                    ws.send(packet);
+                } else {
+                    stopAFKPrevention();
+                }
+            }, 10000);
+        }
+
+        function stopAFKPrevention() {
+            if (afkInterval) {
+                clearInterval(afkInterval);
+                afkInterval = null;
+                addLog('[AFK] AFK prevention stopped', 'warning');
+            }
+        }
+
+        function toggleAFKPrevention() {
+            afkEnabled = !afkEnabled;
+            const btn = document.getElementById('afkToggle');
+            btn.innerHTML = afkEnabled ? '⏱️ AFK: ON' : '⏱️ AFK: OFF';
+            
+            if (afkEnabled && ws && ws.readyState === WebSocket.OPEN && playerId) {
+                startAFKPrevention();
+            } else {
+                stopAFKPrevention();
+            }
+        }
+
+        function toggleRecording() {
+            recording = !recording;
+            const btn = document.getElementById('recordToggle');
+            btn.innerHTML = recording ? '⏺ RECORD: ON' : '⏺ RECORD: OFF';
+            
+            if (recording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        // ==================== CONNECTION ====================
+        function connectToSelected() {
+            if (!selectedServer) {
+                addLog('[ERROR] No server selected', 'error');
+                return;
+            }
+            
+            const password = document.getElementById('serverPassword').value;
+            if (!password) {
+                addLog('[ERROR] Password required', 'error');
+                alert('Password is required');
+                return;
+            }
+            
+            connect(selectedServer.url, password);
+        }
+
+        function connect(url, password) {
+            if (ws) ws.close();
+            
+            stopAFKPrevention();
+            players.clear();
+            entityMap.clear();
+            packetCount = 0;
+            authenticated = false;
+            playerId = null;
+            spectatorSent = false;
+            
+            addLog(`[CONNECTION] Connecting...`, 'info');
+            showStatus(`CONNECTING...`, 'status-connecting');
+            
+            try {
+                ws = new WebSocket(url);
+                ws.binaryType = 'arraybuffer';
+                
+                const timeout = setTimeout(() => {
+                    if (ws && ws.readyState !== WebSocket.OPEN) {
+                        ws.close();
+                        addLog('[ERROR] Connection timeout', 'error');
+                    }
+                }, 10000);
+                
+                ws.onopen = () => {
+                    clearTimeout(timeout);
+                    addLog(`[CONNECTION] ✅ Connected`, 'success');
+                    showStatus(`CONNECTED`, 'status-connected');
+                    
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    document.getElementById('gameView').style.display = 'block';
+                    
+                    sendAuthentication(password);
+                    startRecording();
+                };
+                
+                ws.onmessage = (event) => {
+                    const data = new Uint8Array(event.data);
+                    packetCount++;
+                    parseMessage(data);
+                    
+                    if (!authenticated && packetCount > 2) {
+                        authenticated = true;
+                        addLog('[AUTH] ✅ Authentication successful', 'success');
+                        
+                        if (document.getElementById('autoSpectator').checked) {
+                            setTimeout(sendSpectatorCommand, 1000);
+                        }
+                    }
+                    
+                    drawCanvas();
+                    updatePlayerList();
+                };
+                
+                ws.onclose = () => {
+                    clearTimeout(timeout);
+                    stopAFKPrevention();
+                    addLog('[CONNECTION] Disconnected', 'warning');
+                    showStatus('DISCONNECTED', 'status-error');
+                    
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    stopRecording();
+                };
+                
+                ws.onerror = () => {
+                    clearTimeout(timeout);
+                    stopAFKPrevention();
+                    addLog('[ERROR] Connection failed', 'error');
+                    showStatus('CONNECTION FAILED', 'status-error');
+                };
+                
+            } catch (error) {
+                addLog(`[ERROR] Connection failed: ${error.message}`, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                stopAFKPrevention();
+            }
+        }
+
+        // ==================== RECORDING ====================
+        function startRecording() {
+            recordingStartTime = Date.now();
+            currentRecording = {
+                id: Date.now(),
+                startTime: recordingStartTime,
+                server: selectedServer?.displayName,
+                packets: [],
+                goals: []
+            };
+            
+            addLog('[RECORDING] Started', 'success');
+            
+            if (recordingInterval) clearInterval(recordingInterval);
+            recordingInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                document.getElementById('recordingTimer').innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function stopRecording() {
+            if (recordingInterval) {
+                clearInterval(recordingInterval);
+                recordingInterval = null;
+            }
+            
+            if (currentRecording) {
+                addLog(`[RECORDING] Stopped`, 'info');
+                currentRecording = null;
+            }
+            
+            document.getElementById('recordingTimer').innerText = '00:00';
+        }
+
+        function exportRecording() {
+            if (!currentRecording || currentRecording.packets.length === 0) {
+                addLog('[EXPORT] No recording', 'warning');
+                return;
+            }
+            
+            const recordingData = {
+                timestamp: new Date().toISOString(),
+                server: selectedServer?.displayName,
+                duration: Date.now() - recordingStartTime,
+                players: Array.from(players.values()).map(p => ({
+                    name: p.name,
+                    team: p.team,
+                    goals: p.goals
+                })),
+                goals: currentRecording.goals
+            };
+            
+            const blob = new Blob([JSON.stringify(recordingData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `match-${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.json`;
+            a.click();
+            
+            addLog(`[EXPORT] Recording saved`, 'success');
+        }
+
+        // ==================== UI ====================
+        function drawCanvas() {
+            const canvas = document.getElementById('gameCanvas');
+            if (!canvas) return;
+            
             const ctx = canvas.getContext('2d');
-            const FIELD = { minX: -15, maxX: 30, minZ: -25, maxZ: 40 };
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            let frame = 0, playing = false;
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            function draw() {
-              const sample = gameData.samples[frame] || gameData.samples[0];
-              if (!sample) return;
-              
-              ctx.clearRect(0,0,450,650);
-              ctx.fillStyle = '#1e4d2b';
-              ctx.fillRect(0,0,450,650);
-              
-              const scaleX = x => ((x - FIELD.minX) / (FIELD.maxX - FIELD.minX)) * 450;
-              const scaleZ = z => 650 - ((z - FIELD.minZ) / (FIELD.maxZ - FIELD.minZ)) * 650;
-              
-              if (sample.ball) {
-                const x = scaleX(sample.ball.x);
-                const z = scaleZ(sample.ball.z);
-                ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, 0);
+            ctx.lineTo(canvas.width/2, canvas.height);
+            ctx.stroke();
+            
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.arc(canvas.width/2, canvas.height/2, 80, 0, Math.PI * 2);
+            ctx.strokeStyle = '#00d4ff';
+            ctx.stroke();
+            
+            ctx.fillStyle = '#00d4ff';
+            ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
+            ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
+            
+            const scaleX = x => (x / 50) * canvas.width/2 + canvas.width/2;
+            const scaleZ = z => (z / 50) * canvas.height/2 + canvas.height/2;
+            
+            players.forEach(player => {
+                if (player.x === undefined) return;
+                
+                ctx.fillStyle = player.team === 1 ? '#00d4ff' : '#ef4444';
                 ctx.beginPath();
-                ctx.arc(x, z, 5, 0, Math.PI*2);
+                ctx.arc(scaleX(player.x), scaleZ(player.z), 10, 0, Math.PI * 2);
                 ctx.fill();
-              }
-              
-              sample.players?.forEach(p => {
-                const x = scaleX(p.x);
-                const z = scaleZ(p.z);
-                ctx.fillStyle = p.team === 'blue' ? '#00d4ff' : '#ff4466';
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '12px Arial';
+                ctx.fillText(player.name, scaleX(player.x) - 20, scaleZ(player.z) - 15);
+            });
+            
+            if (ball.x) {
+                ctx.fillStyle = 'white';
                 ctx.beginPath();
-                ctx.arc(x, z, 8, 0, Math.PI*2);
+                ctx.arc(scaleX(ball.x), scaleZ(ball.z), 8, 0, Math.PI * 2);
                 ctx.fill();
-              });
-              
-              const secs = Math.floor(sample.t / 1000);
-              document.getElementById('time').textContent = \`\${Math.floor(secs/60)}:\${(secs%60).toString().padStart(2,'0')}\`;
             }
+        }
+
+        function updatePlayerList() {
+            const list = document.getElementById('playerList');
+            const count = document.getElementById('playerCount');
+            if (!list) return;
             
-            function play() {
-              playing = true;
-              function step() {
-                if (!playing) return;
-                frame = Math.min(frame + 1, gameData.samples.length - 1);
-                draw();
-                setTimeout(step, 200);
-              }
-              step();
+            let html = '';
+            players.forEach(player => {
+                let teamName = player.team === 1 ? '🔵 BLUE' : '🔴 RED';
+                html += `
+                    <div class="player-item">
+                        <span><span class="team-${player.team === 1 ? 'blue' : 'red'}">●</span> ${player.name}</span>
+                        <span>${teamName} | Goals: ${player.goals || 0}</span>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html || '<div style="padding: 20px; text-align: center;">No players yet</div>';
+            if (count) count.innerText = `(${players.size})`;
+        }
+
+        function updateGameTime() {
+            const mins = Math.floor(gameState.timeRemaining / 60);
+            const secs = Math.floor(gameState.timeRemaining % 60);
+            document.getElementById('gameTime').innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function showStatus(message, className) {
+            const status = document.getElementById('connectionStatus');
+            if (!status) return;
+            
+            status.style.display = 'block';
+            status.className = `connection-status ${className}`;
+            status.innerText = message;
+        }
+
+        // ==================== DETECTIONS ====================
+        function detectCheater(player, pattern) {
+            const detection = {
+                id: Date.now(),
+                timestamp: new Date().toISOString(),
+                playerName: player.name,
+                team: player.team,
+                server: selectedServer?.displayName,
+                confidence: 85,
+                pattern: pattern
+            };
+            
+            detections.push(detection);
+            localStorage.setItem('duckDetections', JSON.stringify(detections));
+            updateDetectionsList();
+            addLog(`[🚨 CHEATER] ${player.name}`, 'error');
+        }
+
+        function updateDetectionsList() {
+            const list = document.getElementById('detectionsList');
+            if (!list) return;
+            
+            list.innerHTML = detections.slice(-10).reverse().map(d => `
+                <div class="detection-card">
+                    <div><strong>⚠️ ${d.playerName}</strong> <span style="color:#888;">${new Date(d.timestamp).toLocaleTimeString()}</span></div>
+                    <div>Confidence: ${d.confidence}%</div>
+                </div>
+            `).join('');
+        }
+
+        function exportDetections() {
+            const csv = detections.map(d => `${d.timestamp},${d.playerName},${d.team},${d.confidence}`).join('\n');
+            const blob = new Blob(['Timestamp,Player,Team,Confidence\n' + csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `detections-${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+
+        function clearDetections() {
+            if (confirm('Clear detection history?')) {
+                detections = [];
+                localStorage.setItem('duckDetections', '[]');
+                updateDetectionsList();
             }
-            
-            function pause() { playing = false; }
-            
-            draw();
-          <\/script>
-        </body>
-        </html>
-      `;
-    }
-    
-    // ==================== UI HELPERS ====================
-    function updateStatus(status, text) {
-      const dot = document.getElementById('statusDot');
-      const statusText = document.getElementById('statusText');
-      
-      dot.className = `status-dot ${status}`;
-      statusText.textContent = text;
-      
-      document.getElementById('connectionStatus').className = `status-dot ${status}`;
-      document.getElementById('connectBtn').disabled = !selectedServer;
-      document.getElementById('disconnectBtn').disabled = status !== 'connected';
-    }
-    
-    // ==================== INIT ====================
-    function init() {
-      // Render server lists
-      const nyDiv = document.getElementById('ny-servers');
-      SERVERS.ny.forEach(s => {
-        const div = document.createElement('div');
-        div.className = 'server-card';
-        div.innerHTML = `<span class="name">${s.name}</span><span class="status"></span>`;
-        div.onclick = () => {
-          document.querySelectorAll('.server-card').forEach(c => c.classList.remove('selected'));
-          div.classList.add('selected');
-          selectedServer = s;
-          document.getElementById('connectBtn').disabled = false;
-        };
-        nyDiv.appendChild(div);
-      });
-      
-      const fraDiv = document.getElementById('fra-servers');
-      SERVERS.fra.forEach(s => {
-        const div = document.createElement('div');
-        div.className = 'server-card';
-        div.innerHTML = `<span class="name">${s.name}</span><span class="status"></span>`;
-        div.onclick = () => {
-          document.querySelectorAll('.server-card').forEach(c => c.classList.remove('selected'));
-          div.classList.add('selected');
-          selectedServer = s;
-          document.getElementById('connectBtn').disabled = false;
-        };
-        fraDiv.appendChild(div);
-      });
-      
-      // Connect button
-      document.getElementById('connectBtn').onclick = () => {
-        if (selectedServer) connectToServer(selectedServer);
-      };
-      
-      document.getElementById('disconnectBtn').onclick = disconnect;
-      
-      // Manual spectator
-      document.getElementById('manualSpectatorBtn').onclick = () => {
-        if (ws && ws.readyState === WebSocket.OPEN && playerId) {
-          ws.send(createSpectatorPacket(playerId));
         }
-      };
-      
-      // Record button
-      document.getElementById('startRecordBtn').onclick = () => {
-        if (state.recording) stopRecording();
-        else startRecording();
-      };
-      
-      // Tab switching
-      document.querySelectorAll('.tab').forEach(tab => {
-        tab.onclick = () => {
-          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          
-          document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
-          document.getElementById(tab.dataset.tab + 'Tab').classList.remove('hidden');
-        };
-      });
-      
-      // Saved games
-      document.getElementById('showSavedBtn').onclick = () => {
-        document.querySelector('[data-tab="saved"]').click();
-        updateSavedGames();
-      };
-      
-      document.getElementById('clearSavedBtn').onclick = () => {
-        if (confirm('Clear all saved games?')) {
-          localStorage.removeItem('duck-saved-games');
-          updateSavedGames();
-        }
-      };
-      
-      updateSavedGames();
-      updateStatus('disconnected', 'Not connected');
-      renderCanvas();
-    }
-    
-    init();
-  </script>
+
+        // ==================== INIT ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            initServers();
+            updateDetectionsList();
+            setInterval(drawCanvas, 50);
+            
+            addLog('[SYSTEM] 🦆 Duck Analyzer v23.0 initialized', 'success');
+            addLog('[SYSTEM] Duck Mod packet parsing active', 'info');
+            addLog('[SYSTEM] Auto-spectator enabled', 'info');
+        });
+    </script>
 </body>
 </html>
