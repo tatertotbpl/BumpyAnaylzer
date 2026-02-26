@@ -476,7 +476,16 @@
       const lenBytes = w7bit(innerPacket.length);
       return new Uint8Array([0x0a, ...lenBytes, ...innerPacket]);
     }
-    
+
+    function autoSpectatorWhenReady() {
+  const check = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN && playerId) {
+      ws.send(createSpectatorPacket(playerId));
+      console.log('[SPECTATOR] Auto spectator sent for player', playerId);
+      clearInterval(check);
+    }
+  }, 500);
+}
     // ==================== PACKET PARSING ====================
     function parseMessage(data) {
       if (data.length < 5 || data[0] !== 10) return;
@@ -708,8 +717,7 @@
       
       detailedList.innerHTML = detailedHtml;
       
-      // Render canvas
-      renderCanvas();
+
     }
     
     function renderCanvas() {
@@ -817,68 +825,72 @@
     
     // ==================== CONNECTION ====================
     function connectToServer(server) {
-      if (ws) ws.close();
-      
-      playerId = null;
-      myName = null;
-      state.players = {};
-      state.entityMap = {};
-      state.positions = {};
-      state.ballEntityId = null;
-      
-      updateStatus('connecting', 'Connecting...');
-      
-      try {
-        ws = new WebSocket(server.url);
-        ws.binaryType = 'arraybuffer';
-        
-        ws.onopen = () => {
-          updateStatus('connected', `Connected to ${server.name}`);
-          
-          const username = `Duck_${Math.floor(Math.random() * 1000)}`;
-          const uid = Array(28).fill().map(() => 
-            'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 62)]
-          ).join('');
-          
-          const authPacket = createAuthPacket(username, uid, document.getElementById('passwordInput').value || 'rodshot');
-          ws.send(authPacket);
-          
-          // Start AFK prevention
-          if (afkInterval) clearInterval(afkInterval);
-          afkInterval = setInterval(() => {
-            if (ws && ws.readyState === WebSocket.OPEN && playerId) {
-              ws.send(createAFKPacket(playerId));
-            }
-          }, 10000);
-        };
-        
-        ws.onmessage = (event) => {
-          const data = new Uint8Array(event.data);
-          parseMessage(data);
-        };
-        
-        ws.onclose = () => {
-          updateStatus('disconnected', 'Disconnected');
-          if (afkInterval) clearInterval(afkInterval);
-        };
-        
-        ws.onerror = () => {
-          updateStatus('disconnected', 'Connection error');
-        };
-        
-      } catch (e) {
-        updateStatus('disconnected', 'Connection failed');
-      }
-    }
+  if (ws) ws.close();
+  
+  playerId = null;
+  myName = null;
+  state.players = {};
+  state.entityMap = {};
+  state.positions = {};
+  state.ballEntityId = null;
+  
+  updateStatus('connecting', 'Connecting...');
+  
+  try {
+    ws = new WebSocket(server.url);
+    ws.binaryType = 'arraybuffer';
     
-    function disconnect() {
-      if (ws) {
-        ws.close();
-        ws = null;
-      }
+    // ---- OPEN ----
+    ws.onopen = () => {
+      updateStatus('connected', `Connected to ${server.name}`);
+      
+      const username = `Duck_${Math.floor(Math.random() * 1000)}`;
+      const uid = Array(28).fill().map(() => 
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 62)]
+      ).join('');
+      
+      const authPacket = createAuthPacket(
+        username,
+        uid,
+        document.getElementById('passwordInput').value || 'rodshot'
+      );
+      
+      ws.send(authPacket);
+      autoSpectatorWhenReady();
+
+      // Safe heartbeat (prevents disconnect without movement spam)
       if (afkInterval) clearInterval(afkInterval);
+      afkInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN && playerId) {
+          ws.send(createAFKPacket(playerId));
+        }
+      }, 10000);
+    };
+    
+    // ---- MESSAGE ----
+    ws.onmessage = (event) => {
+      const data = new Uint8Array(event.data);
+      parseMessage(data);
+    };
+    
+    // ---- CLOSE ----
+    ws.onclose = () => {
       updateStatus('disconnected', 'Disconnected');
-    }
+      if (afkInterval) {
+        clearInterval(afkInterval);
+        afkInterval = null;
+      }
+    };
+    
+    // ---- ERROR ----
+    ws.onerror = () => {
+      updateStatus('disconnected', 'Connection error');
+    };
+    
+  } catch (e) {
+    updateStatus('disconnected', 'Connection failed');
+  }
+}
     
     // ==================== RECORDING ====================
     function startRecording() {
