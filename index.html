@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DUCK TOURNAMENT ANALYZER v24.0</title>
+    <title>Duck Tournament Anti-Cheat Analyzer v22.0</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0d0d1a 0%, #1a1a2e 100%);
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
             min-height: 100vh;
             padding: 20px;
         }
         .container {
             max-width: 1600px;
             margin: 0 auto;
-            background: linear-gradient(145deg, #1a1a2e 0%, #0f3460 100%);
+            background: #0f3460;
             border-radius: 20px;
             padding: 30px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.7);
@@ -25,7 +25,6 @@
             margin-bottom: 5px;
             font-size: 36px;
             text-shadow: 0 0 10px rgba(0,212,255,0.3);
-            letter-spacing: 2px;
         }
         .subtitle { 
             color: #a0aec0; 
@@ -56,7 +55,7 @@
         }
         
         .server-group {
-            background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
+            background: #1a1a2e;
             border-radius: 15px;
             padding: 20px;
             border: 2px solid #00d4ff;
@@ -80,7 +79,7 @@
         }
         
         .server-card {
-            background: rgba(255,255,255,0.03);
+            background: #0f3460;
             border-radius: 10px;
             padding: 15px;
             margin: 12px 0;
@@ -96,13 +95,13 @@
         .server-card:hover {
             transform: translateX(8px);
             border-color: #00d4ff;
-            background: rgba(0,212,255,0.1);
+            background: #16213e;
             box-shadow: 0 8px 12px rgba(0,212,255,0.2);
         }
         
         .server-card.selected {
             border-color: #4ade80;
-            background: rgba(74,222,128,0.1);
+            background: #14532d;
         }
         
         .server-port {
@@ -136,7 +135,7 @@
         }
         
         .spectator-controls {
-            background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
+            background: #16213e;
             border-radius: 10px;
             padding: 20px;
             margin: 25px 0;
@@ -194,7 +193,7 @@
         }
         
         .connection-panel {
-            background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
+            background: #16213e;
             border-radius: 10px;
             padding: 25px;
             margin: 25px 0;
@@ -202,7 +201,7 @@
         }
         
         .password-input {
-            background: rgba(255,255,255,0.03);
+            background: #0f3460;
             border: 2px solid #00d4ff;
             color: white;
             padding: 15px;
@@ -274,7 +273,7 @@
         .log-state { color: #00d4ff; font-weight: bold; }
         
         .game-view {
-            background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
+            background: #1a1a2e;
             border-radius: 10px;
             padding: 25px;
             margin: 25px 0;
@@ -289,16 +288,16 @@
         }
         
         .stat-box {
-            background: rgba(255,255,255,0.03);
+            background: #0f3460;
             padding: 20px;
             border-radius: 10px;
             text-align: center;
             border: 1px solid #2d3748;
         }
         
-        .stat-box.red { background: rgba(255,68,102,0.1); border-color: #ff4466; }
-        .stat-box.blue { background: rgba(0,212,255,0.1); border-color: #00d4ff; }
-        .stat-box.state { background: rgba(255,255,255,0.03); border-color: #00d4ff; }
+        .stat-box.red { background: #7f1d1d; border-color: #ef4444; }
+        .stat-box.blue { background: #1e3a8a; border-color: #00d4ff; }
+        .stat-box.state { background: #4a235a; border-color: #00d4ff; }
         
         .stat-label {
             font-size: 14px;
@@ -314,26 +313,17 @@
             line-height: 1;
         }
         
-        .field-container {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 45/65;
-            max-width: 600px;
-            margin: 0 auto;
-            border: 2px solid #00d4ff;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        
         #gameCanvas {
             width: 100%;
-            height: 100%;
-            display: block;
-            background: #1e4d2b;
+            height: 500px;
+            background: #0a0a0f;
+            border-radius: 10px;
+            border: 2px solid #00d4ff;
+            box-shadow: 0 0 20px rgba(0,212,255,0.2);
         }
         
         .players-panel {
-            background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
+            background: #16213e;
             border-radius: 10px;
             padding: 20px;
             margin: 25px 0;
@@ -358,11 +348,11 @@
         }
         
         .player-item:hover {
-            background: rgba(0,212,255,0.1);
+            background: #0f3460;
         }
         
         .player-item.suspicious {
-            background: rgba(239,68,68,0.2);
+            background: #7f1d1d;
             border-left: 4px solid #ef4444;
         }
         
@@ -371,12 +361,13 @@
         .team-spectator { color: #a855f7; font-weight: bold; }
         
         .detection-card {
-            background: rgba(239,68,68,0.1);
+            background: #7f1d1d;
             padding: 20px;
             margin: 15px 0;
             border-radius: 10px;
             border-left: 6px solid #ef4444;
             border: 1px solid #ef4444;
+            box-shadow: 0 4px 6px rgba(239,68,68,0.2);
         }
         
         button {
@@ -397,6 +388,7 @@
             background: #00a0cc;
             transform: translateY(-2px);
             box-shadow: 0 8px 15px rgba(0,212,255,0.3);
+            border-color: #4ade80;
         }
         
         button:disabled {
@@ -404,6 +396,7 @@
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
+            border-color: transparent;
         }
         
         button.secondary {
@@ -423,7 +416,7 @@
         }
         
         .selected-info {
-            background: rgba(0,212,255,0.1);
+            background: #1a1a2e;
             padding: 20px;
             border-radius: 10px;
             margin: 15px 0;
@@ -442,19 +435,22 @@
         }
         
         .status-connected { 
-            background: rgba(74,222,128,0.1); 
+            background: #14532d; 
             color: #4ade80; 
             border-color: #4ade80;
+            box-shadow: 0 0 15px rgba(74,222,128,0.3);
         }
         .status-connecting { 
-            background: rgba(251,191,36,0.1); 
+            background: #92400e; 
             color: #fbbf24; 
             border-color: #fbbf24;
+            box-shadow: 0 0 15px rgba(251,191,36,0.3);
         }
         .status-error { 
-            background: rgba(239,68,68,0.1); 
+            background: #7f1d1d; 
             color: #ef4444; 
             border-color: #ef4444;
+            box-shadow: 0 0 15px rgba(239,68,68,0.3);
         }
         
         .footer {
@@ -488,8 +484,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🦆 DUCK TOURNAMENT ANALYZER v24.0</h1>
-        <div class="subtitle">Professional Grade • Authentic Duck Mod Look • Working Auth • Auto-Spectator</div>
+        <h1>🦆 DUCK TOURNAMENT ANALYZER v22.0</h1>
+        <div class="subtitle">Professional Grade • Working Auth • Unity Spectator • Full Recording</div>
         
         <div class="tournament-banner">
             ⚡ ACTIVE TOURNAMENT SERVERS: NEW YORK (4) • FRANKFURT (4) • PASSWORD: RODSHOT
@@ -597,9 +593,7 @@
                 </div>
                 
                 <!-- Game Canvas -->
-                <div class="field-container">
-                    <canvas id="gameCanvas" width="450" height="650"></canvas>
-                </div>
+                <canvas id="gameCanvas" width="1200" height="600"></canvas>
                 
                 <!-- Recording Controls -->
                 <div class="button-group" style="margin-top: 20px;">
@@ -627,21 +621,12 @@
         </div>
         
         <div class="footer">
-            🦆 DUCK ANALYZER v24.0 • AUTHENTIC DUCK MOD LOOK • WORKING AUTH • AUTO-SPECTATOR • AFK PREVENTION<br>
+            🦆 DUCK ANALYZER v22.0 • WORKING AUTH • UNITY SPECTATOR • AFK PREVENTION<br>
             Password: rodshot • Works standalone on GitHub Pages
         </div>
     </div>
 
     <script>
-        // ==================== FIELD DIMENSIONS (exact Duck Mod values) ====================
-        const FIELD = {
-            minX: -15, maxX: 30,
-            minZ: -25, maxZ: 40,
-            centerX: 7.5, centerZ: 7.5,
-            goalLeftX: 3.3, goalRightX: 11.7,
-            chamfer: 8
-        };
-
         // ==================== VARINT FUNCTIONS ====================
         const w7bit = num => {
             let r = [];
@@ -651,36 +636,6 @@
             }
             r.push(num % 256);
             return r;
-        };
-
-        const readVarInt = (arr, start) => {
-            let result = 0, shift = 0, pos = start;
-            while (pos < arr.length && shift < 35) {
-                const byte = arr[pos++];
-                result |= (byte & 0x7f) << shift;
-                if ((byte & 0x80) === 0) break;
-                shift += 7;
-            }
-            return [result, pos];
-        };
-
-        const readFloat32 = (arr, start) => {
-            if (start + 4 > arr.length) return [0, start + 4];
-            const buffer = new Uint8Array(arr.slice(start, start + 4)).buffer;
-            return [new Float32Array(buffer)[0], start + 4];
-        };
-
-        const readString = (arr, start) => {
-            if (start >= arr.length) return ["", start];
-            const [len, dataStart] = readVarInt(arr, start);
-            if (len <= 0 || len > 50 || dataStart + len > arr.length) return ["", start];
-            try {
-                const str = new TextDecoder().decode(new Uint8Array(arr.slice(dataStart, dataStart + len)));
-                if (/^[\x20-\x7E\u00A0-\uFFFF]+$/.test(str) && str.trim().length > 0) {
-                    return [str, dataStart + len];
-                }
-            } catch {}
-            return ["", start];
         };
 
         // ==================== TOURNAMENT SERVERS ====================
@@ -709,13 +664,12 @@
             }
         };
 
-        // ==================== WORKING AUTH PACKET (60 bytes, from your capture) ====================
+        // ==================== WORKING AUTH PACKET (60 bytes) ====================
         function createAuthPacket(username, uid, password) {
             let usernameBytes = Array.from(username).map(c => c.charCodeAt(0));
             let uidBytes = Array.from(uid).map(c => c.charCodeAt(0));
             let pwdBytes = Array.from(password).map(c => c.charCodeAt(0));
             
-            // EXACT working packet format: 08 01 12 38 0a 0a 43 61 73...
             return new Uint8Array([
                 0x08, 0x01, 0x12, 0x38,
                 0x0a, usernameBytes.length, ...usernameBytes,
@@ -726,14 +680,13 @@
             ]);
         }
 
-        // ==================== SPECTATOR PACKET (playerId = 0) ====================
+        // ==================== UNITY SPECTATOR PACKET (playerId = 0) ====================
         function createSpectatorPacket() {
             const msgBytes = Array.from("/team spectator").map(c => c.charCodeAt(0));
-            const idBytes = w7bit(0); // Self-initiated command
+            const idBytes = w7bit(0); // Self-initiated command for Unity
             
             const innerPacket = [
-                0x08, 0x05,
-                0x12, 0x0c,
+                0x08, 0x05, 0x12, 0x0c,
                 0x08, ...idBytes,
                 0x12, msgBytes.length, ...msgBytes
             ];
@@ -759,9 +712,7 @@
         // ==================== GAME STATE ====================
         let ws = null;
         let players = new Map();
-        let entityMap = new Map();
         let ball = { x: 0, z: 0 };
-        let ballEntityId = null;
         let gameState = {
             timeRemaining: 300,
             redScore: 0,
@@ -875,12 +826,17 @@
 
         // ==================== AUTH ====================
         function generateUsername() {
-            return `Duck${Math.floor(Math.random() * 900) + 100}`;
+            const num = Math.floor(Math.random() * 900) + 100;
+            return `Duck${num}`;
         }
 
         function generateUID() {
             const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            return Array(28).fill().map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
+            let result = '';
+            for (let i = 0; i < 28; i++) {
+                result += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return result;
         }
 
         function sendAuthentication(password) {
@@ -896,6 +852,8 @@
                 const uid = generateUID();
                 
                 addLog(`[AUTH] Username: ${username}`, 'info');
+                addLog(`[AUTH] UID: ${uid}`, 'info');
+                
                 const packet = createAuthPacket(username, uid, password);
                 ws.send(packet);
                 
@@ -904,211 +862,15 @@
             }
         }
 
-        // ==================== PACKET PARSING ====================
-        function parseMessage(data) {
-            if (data.length < 5 || data[0] !== 10) return;
-            
-            const [, afterLen] = readVarInt(data, 1);
-            if (data[afterLen] !== 8) return;
-            
-            const [code] = readVarInt(data, afterLen + 1);
-            
-            switch (code) {
-                case 2: case 3: case 8: case 13: case 15:
-                    parsePlayerData(data);
-                    parseEntityMappings(data);
-                    break;
-                case 6:
-                    parsePositions(data);
-                    break;
-                case 11:
-                    parseGoal(data);
-                    break;
-                case 12:
-                    parseGameStateUpdate(data);
-                    break;
-            }
-        }
-
-        function parsePlayerData(arr) {
-            let currentId = null, currentName = null, currentTeam = 0;
-            
-            for (let i = 0; i < arr.length - 2; i++) {
-                if (arr[i] === 8) {
-                    const [val, nextPos] = readVarInt(arr, i + 1);
-                    if (val >= 100 && val < 15000) {
-                        let hasName = false;
-                        for (let j = nextPos; j < Math.min(nextPos + 5, arr.length); j++) {
-                            if (arr[j] === 18) {
-                                const [strLen] = readVarInt(arr, j + 1);
-                                if (strLen >= 2 && strLen <= 20) {
-                                    hasName = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (hasName) {
-                            if (currentId !== null && currentName !== null) {
-                                updatePlayer(currentId, currentName, currentTeam);
-                            }
-                            currentId = val;
-                            currentName = null;
-                            currentTeam = 0;
-                        }
-                    }
-                }
-                
-                if (arr[i] === 18 && currentId !== null && currentName === null) {
-                    const [str] = readString(arr, i + 1);
-                    if (str.length >= 2 && str.length <= 20 && !/^[a-f0-9]{8}-/i.test(str)) {
-                        currentName = str;
-                        if (!playerId && str.includes('Duck')) {
-                            playerId = currentId;
-                            addLog(`[AUTH] Player ID: ${playerId}`, 'success');
-                        }
-                    }
-                }
-                
-                if (arr[i] === 40 && currentId !== null) {
-                    const [val] = readVarInt(arr, i + 1);
-                    if (val === 1) currentTeam = 1;
-                }
-            }
-            
-            if (currentId !== null && currentName !== null) {
-                updatePlayer(currentId, currentName, currentTeam);
-            }
-        }
-
-        function updatePlayer(id, name, team) {
-            let player = players.get(id) || {
-                id, name, team,
-                boosts: [],
-                suspicious: false,
-                goals: 0,
-                assists: 0
-            };
-            player.name = name;
-            player.team = team;
-            players.set(id, player);
-            
-            if (movementLogging) {
-                let teamName = team === 1 ? '🔵' : '🔴';
-                addLog(`${teamName} ${name} joined`, 'player');
-            }
-        }
-
-        function parseEntityMappings(arr) {
-            const knownIds = new Set(Array.from(players.keys()).map(Number));
-            
-            for (let i = 0; i < arr.length - 10; i++) {
-                if (arr[i] === 10) {
-                    const [blockLen, afterBlock] = readVarInt(arr, i + 1);
-                    if (blockLen >= 20 && blockLen <= 100 && arr[afterBlock] === 8) {
-                        const [entityId, afterEntity] = readVarInt(arr, afterBlock + 1);
-                        if (entityId > 1000 && entityId < 10000000 && !entityMap.has(entityId)) {
-                            const blockEnd = Math.min(i + blockLen + 5, arr.length - 2);
-                            for (let j = afterEntity; j < blockEnd; j++) {
-                                if (arr[j] === 24) {
-                                    const [constId] = readVarInt(arr, j + 1);
-                                    if (knownIds.has(constId)) {
-                                        entityMap.set(entityId, constId);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        function parsePositions(arr) {
-            for (let i = 0; i < arr.length - 15; i++) {
-                if (arr[i] === 18 && arr[i + 2] === 8) {
-                    const sublen = arr[i + 1];
-                    if (sublen >= 10 && sublen <= 50) {
-                        const [entityId, nextPos] = readVarInt(arr, i + 3);
-                        
-                        if (entityId > 100 && entityId < 1000000) {
-                            for (let j = nextPos; j < Math.min(nextPos + 20, arr.length - 10); j++) {
-                                if (arr[j] === 18 && arr[j + 1] === 10 && arr[j + 2] === 13) {
-                                    const [x] = readFloat32(arr, j + 3);
-                                    if (arr[j + 7] === 21) {
-                                        const [z] = readFloat32(arr, j + 8);
-                                        
-                                        if (Math.abs(x) < 500 && Math.abs(z) < 500) {
-                                            const constId = entityMap.get(entityId);
-                                            if (constId) {
-                                                let player = players.get(constId);
-                                                if (player) {
-                                                    player.x = x;
-                                                    player.z = z;
-                                                    players.set(constId, player);
-                                                }
-                                            } else if (entityId > 100000) {
-                                                ball = { x, z };
-                                                ballEntityId = entityId;
-                                            }
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        function parseGameStateUpdate(arr) {
-            for (let i = 0; i < arr.length - 4; i++) {
-                if (arr[i] === 13) {
-                    const [time] = readFloat32(arr, i + 1);
-                    if (time >= 0 && time <= 600) {
-                        gameState.timeRemaining = time;
-                        updateGameTime();
-                    }
-                    break;
-                }
-            }
-        }
-
-        function parseGoal(arr) {
-            const now = Date.now();
-            let scorer = null, team = null;
-            
-            for (let i = 0; i < arr.length - 3; i++) {
-                if (arr[i] === 8) {
-                    const [val] = readVarInt(arr, i + 1);
-                    if (val >= 100 && val < 15000) {
-                        const player = players.get(val);
-                        if (player) {
-                            scorer = player.name;
-                            team = player.team === 1 ? 'blue' : 'red';
-                            player.goals = (player.goals || 0) + 1;
-                            players.set(val, player);
-                            addLog(`⚽ GOAL! ${scorer} scored!`, 'goal');
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            if (recording && currentRecording) {
-                currentRecording.goals.push({
-                    t: now - recordingStartTime,
-                    scorer,
-                    team
-                });
-            }
-        }
-
         // ==================== SPECTATOR ====================
         function sendSpectatorCommand() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 addLog('[ERROR] Cannot send spectator command - Not connected', 'error');
                 return;
+            }
+            
+            if (!playerId && !spectatorSent) {
+                addLog('[SPECTATOR] No player ID yet, but trying with Unity protocol...', 'info');
             }
             
             addLog('[SPECTATOR] Sending /team spectator command...', 'info');
@@ -1201,7 +963,6 @@
             
             stopAFKPrevention();
             players.clear();
-            entityMap.clear();
             packetCount = 0;
             authenticated = false;
             playerId = null;
@@ -1237,7 +998,18 @@
                 ws.onmessage = (event) => {
                     const data = new Uint8Array(event.data);
                     packetCount++;
-                    parseMessage(data);
+                    
+                    // Simple packet parsing to get player ID
+                    if (data[1] === 2 && !playerId) {
+                        // Try to find player ID in packet
+                        for (let i = 0; i < data.length - 4; i++) {
+                            if (data[i] === 0x18 && data[i+1] < 128) {
+                                playerId = data[i+1];
+                                addLog(`[AUTH] Player ID: ${playerId}`, 'success');
+                                break;
+                            }
+                        }
+                    }
                     
                     if (!authenticated && packetCount > 2) {
                         authenticated = true;
@@ -1248,6 +1020,7 @@
                         }
                     }
                     
+                    // Basic canvas update
                     drawCanvas();
                     updatePlayerList();
                 };
@@ -1347,193 +1120,57 @@
             addLog(`[EXPORT] Recording saved`, 'success');
         }
 
-        // ==================== AUTHENTIC DUCK MOD 2D RENDERING ====================
-        function drawField(ctx, w, h) {
-            const pad = 6;
-            const fieldW = w - pad * 2;
-            const fieldH = h - pad * 2;
-            const rangeX = FIELD.maxX - FIELD.minX;
-            const rangeZ = FIELD.maxZ - FIELD.minZ;
-            const chamferPx = (FIELD.chamfer / rangeX) * fieldW;
-
-            // Field background
-            ctx.fillStyle = '#1e4d2b';
-            ctx.fillRect(pad, pad, fieldW, fieldH);
-
-            // Grass stripes
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(pad + chamferPx, pad);
-            ctx.lineTo(pad + fieldW - chamferPx, pad);
-            ctx.lineTo(pad + fieldW, pad + chamferPx);
-            ctx.lineTo(pad + fieldW, pad + fieldH - chamferPx);
-            ctx.lineTo(pad + fieldW - chamferPx, pad + fieldH);
-            ctx.lineTo(pad + chamferPx, pad + fieldH);
-            ctx.lineTo(pad, pad + fieldH - chamferPx);
-            ctx.lineTo(pad, pad + chamferPx);
-            ctx.closePath();
-            ctx.clip();
-            
-            ctx.fillStyle = '#225533';
-            const stripeHeight = fieldH / 12;
-            for (let i = 0; i < 6; i++) {
-                ctx.fillRect(pad, pad + i * 2 * stripeHeight, fieldW, stripeHeight);
-            }
-            ctx.restore();
-
-            // Field outline
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(pad + chamferPx, pad);
-            ctx.lineTo(pad + fieldW - chamferPx, pad);
-            ctx.lineTo(pad + fieldW, pad + chamferPx);
-            ctx.lineTo(pad + fieldW, pad + fieldH - chamferPx);
-            ctx.lineTo(pad + fieldW - chamferPx, pad + fieldH);
-            ctx.lineTo(pad + chamferPx, pad + fieldH);
-            ctx.lineTo(pad, pad + fieldH - chamferPx);
-            ctx.lineTo(pad, pad + chamferPx);
-            ctx.closePath();
-            ctx.stroke();
-
-            // Center line
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(pad, pad + fieldH / 2);
-            ctx.lineTo(pad + fieldW, pad + fieldH / 2);
-            ctx.stroke();
-
-            // Center circle
-            ctx.beginPath();
-            ctx.arc(pad + fieldW / 2, pad + fieldH / 2, 18, 0, Math.PI * 2);
-            ctx.stroke();
-
-            // Center spot
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-            ctx.beginPath();
-            ctx.arc(pad + fieldW / 2, pad + fieldH / 2, 2, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Goal areas
-            ctx.strokeStyle = 'rgba(100, 180, 255, 0.5)';
-            ctx.strokeRect(pad + fieldW * 0.35 - 8, pad + fieldH - 12, fieldW * 0.3 + 16, 12);
-            ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
-            ctx.strokeRect(pad + fieldW * 0.35 - 8, pad, fieldW * 0.3 + 16, 12);
-
-            // Goal lines
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = '#00d4ff';
-            ctx.beginPath();
-            ctx.moveTo(pad + fieldW * 0.35, pad + fieldH);
-            ctx.lineTo(pad + fieldW * 0.65, pad + fieldH);
-            ctx.stroke();
-
-            ctx.strokeStyle = '#ff4466';
-            ctx.beginPath();
-            ctx.moveTo(pad + fieldW * 0.35, pad);
-            ctx.lineTo(pad + fieldW * 0.65, pad);
-            ctx.stroke();
-        }
-
+        // ==================== UI ====================
         function drawCanvas() {
             const canvas = document.getElementById('gameCanvas');
             if (!canvas) return;
             
             const ctx = canvas.getContext('2d');
-            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Draw field
-            drawField(ctx, w, h);
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, 0);
+            ctx.lineTo(canvas.width/2, canvas.height);
+            ctx.stroke();
             
-            // Scale functions
-            const pad = 6;
-            const fieldW = w - pad * 2;
-            const fieldH = h - pad * 2;
-            const rangeX = FIELD.maxX - FIELD.minX;
-            const rangeZ = FIELD.maxZ - FIELD.minZ;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.arc(canvas.width/2, canvas.height/2, 80, 0, Math.PI * 2);
+            ctx.strokeStyle = '#00d4ff';
+            ctx.stroke();
             
-            const scaleX = (x) => pad + ((x - FIELD.minX) / rangeX) * fieldW;
-            const scaleZ = (z) => h - pad - ((z - FIELD.minZ) / rangeZ) * fieldH;
+            ctx.fillStyle = '#00d4ff';
+            ctx.fillRect(canvas.width/2 - 50, 0, 100, 15);
+            ctx.fillRect(canvas.width/2 - 50, canvas.height - 15, 100, 15);
             
-            // Draw ball
-            if (ball.x && ball.z) {
-                const bx = scaleX(ball.x);
-                const bz = scaleZ(ball.z);
-                
-                ctx.shadowColor = '#fff';
-                ctx.shadowBlur = 10;
-                ctx.beginPath();
-                ctx.arc(bx, bz, 5, 0, Math.PI * 2);
-                ctx.fillStyle = '#fff';
-                ctx.fill();
-                ctx.shadowBlur = 0;
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }
+            const scaleX = x => (x / 50) * canvas.width/2 + canvas.width/2;
+            const scaleZ = z => (z / 50) * canvas.height/2 + canvas.height/2;
             
-            // Draw players
             players.forEach(player => {
-                if (player.x === undefined || player.z === undefined) return;
+                if (player.x === undefined) return;
                 
-                const px = scaleX(player.x);
-                const pz = scaleZ(player.z);
-                const color = player.team === 1 ? '#00d4ff' : '#ff4466';
-                
-                // Draw car
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 8;
+                ctx.fillStyle = player.team === 1 ? '#00d4ff' : '#ef4444';
                 ctx.beginPath();
-                ctx.arc(px, pz, 6, 0, Math.PI * 2);
-                ctx.fillStyle = color;
+                ctx.arc(scaleX(player.x), scaleZ(player.z), 10, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.shadowBlur = 0;
-                ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
                 
-                // Draw direction indicator (from Duck Mod)
-                const vx = player.vx || 0;
-                const vz = player.vz || 0;
-                const speed = Math.sqrt(vx*vx + vz*vz);
-                if (speed > 0.01) {
-                    const angle = Math.atan2(vz, vx);
-                    const arrowLen = Math.min(speed * 40, 20);
-                    const endX = px + Math.cos(angle) * arrowLen;
-                    const endY = pz - Math.sin(angle) * arrowLen;
-                    
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(px, pz);
-                    ctx.lineTo(endX, endY);
-                    ctx.stroke();
-                    
-                    // Arrowhead
-                    const headLen = 4;
-                    const headAngle = 0.5;
-                    ctx.beginPath();
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - Math.cos(angle - headAngle) * headLen,
-                             endY + Math.sin(angle - headAngle) * headLen);
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - Math.cos(angle + headAngle) * headLen,
-                             endY + Math.sin(angle + headAngle) * headLen);
-                    ctx.stroke();
-                }
-                
-                // Player name
-                ctx.font = 'bold 8px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillStyle = 'rgba(255,255,255,0.9)';
-                ctx.shadowColor = '#000';
-                ctx.shadowBlur = 2;
-                ctx.fillText(player.name.length > 6 ? player.name.slice(0,5) + '..' : player.name, px, pz - 10);
-                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'white';
+                ctx.font = '12px Arial';
+                ctx.fillText(player.name, scaleX(player.x) - 20, scaleZ(player.z) - 15);
             });
+            
+            if (ball.x) {
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(scaleX(ball.x), scaleZ(ball.z), 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         function updatePlayerList() {
@@ -1628,8 +1265,9 @@
             updateDetectionsList();
             setInterval(drawCanvas, 50);
             
-            addLog('[SYSTEM] 🦆 Duck Analyzer v24.0 initialized', 'success');
+            addLog('[SYSTEM] 🦆 Duck Analyzer v22.0 initialized', 'success');
             addLog('[SYSTEM] Working auth packet (60 bytes)', 'info');
+            addLog('[SYSTEM] Unity spectator protocol active', 'info');
             addLog('[SYSTEM] Auto-spectator enabled', 'info');
         });
     </script>
