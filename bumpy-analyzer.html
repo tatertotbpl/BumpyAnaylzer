@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Analyze Bumpy match replays with heatmaps, player stats, and goal tracking">
+  <meta name="theme-color" content="#0d0d1a">
+  <title>Bumpy Match Analyzer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(145deg, #0d0d1a 0%, #1a1a2e 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: linear-gradient(90deg, rgba(0, 212, 255, 0.15) 0%, rgba(255, 68, 102, 0.15) 100%);
+      padding: 20px 30px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 600;
+    }
+    .logo .duck { color: #00d4ff; }
+    .logo .mod { color: #888; font-weight: 300; margin-left: 8px; }
+
+    .drop-zone {
+      border: 2px dashed rgba(0, 212, 255, 0.4);
+      border-radius: 12px;
+      padding: 60px;
+      text-align: center;
+      margin: 30px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #00d4ff;
+      background: rgba(0, 212, 255, 0.05);
+    }
+    .drop-zone h2 { color: #00d4ff; margin-bottom: 10px; }
+    .drop-zone p { color: #666; }
+
+    .hidden { display: none !important; }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 20px 30px;
+    }
+
+    @media (max-width: 1200px) {
+      .dashboard { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: linear-gradient(145deg, #1a1a2e 0%, #0d0d1a 100%);
+      border: 1px solid rgba(0, 212, 255, 0.2);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      background: rgba(0, 212, 255, 0.1);
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .card-content { padding: 16px; }
+
+    .match-info {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+    .match-info .stat {
+      text-align: center;
+    }
+    .match-info .stat-value {
+      font-size: 28px;
+      font-weight: 600;
+      color: #00d4ff;
+    }
+    .match-info .stat-label {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+    }
+
+    .field-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 45/65;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    #heatmapCanvas, #replayCanvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+    }
+
+    .heatmap-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .heatmap-btn {
+      background: linear-gradient(145deg, #333 0%, #222 100%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #888;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s ease;
+    }
+    .heatmap-btn:hover { background: linear-gradient(145deg, #444 0%, #333 100%); }
+    .heatmap-btn.active {
+      background: linear-gradient(145deg, #00d4ff 0%, #00a0cc 100%);
+      color: #000;
+      border-color: #00d4ff;
+    }
+    .heatmap-btn.red.active {
+      background: linear-gradient(145deg, #ff4466 0%, #cc3355 100%);
+      border-color: #ff4466;
+    }
+
+    .player-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .player-card {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      padding: 12px;
+      border-left: 3px solid;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .player-card:hover { background: rgba(255, 255, 255, 0.08); }
+    .player-card.blue { border-color: #00d4ff; }
+    .player-card.red { border-color: #ff4466; }
+    .player-card.selected { background: rgba(255, 255, 255, 0.15); }
+    .player-card.selected.blue { box-shadow: 0 0 10px rgba(0, 212, 255, 0.3); }
+    .player-card.selected.red { box-shadow: 0 0 10px rgba(255, 68, 102, 0.3); }
+
+    .team-section { margin-bottom: 20px; }
+    .team-header {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-block;
+    }
+    .team-header:hover { opacity: 0.8; }
+    .team-header.blue { color: #000; background: linear-gradient(90deg, #00d4ff, #00a0cc); }
+    .team-header.red { color: #fff; background: linear-gradient(90deg, #ff4466, #cc3355); }
+
+    .player-name {
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .player-card.blue .player-name { color: #00d4ff; }
+    .player-card.red .player-name { color: #ff4466; }
+
+    .player-stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 2px 0;
+      color: #888;
+    }
+    .player-stat-row span:last-child { color: #fff; }
+
+    .possession-bar {
+      display: flex;
+      height: 30px;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .possession-bar .blue {
+      background: linear-gradient(90deg, #00d4ff, #00a0cc);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      color: #000;
+    }
+    .possession-bar .red {
+      background: linear-gradient(90deg, #cc3355, #ff4466);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .replay-controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-top: 30px;
+      padding-top: 10px;
+    }
+
+    .play-btn {
+      background: linear-gradient(145deg, #00d4ff 0%, #00a0cc 100%);
+      border: none;
+      color: #000;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .timeline {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+    }
+    .timeline-progress {
+      height: 100%;
+      background: linear-gradient(90deg, #00d4ff, #ff4466);
+      border-radius: 3px;
+      width: 0%;
+    }
+    .timeline-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      left: 0%;
+    }
+    .goal-marker {
+      position: absolute;
+      top: -8px;
+      transform: translateX(-50%);
+      width: 3px;
+      height: 22px;
+      border-radius: 2px;
+    }
+    .goal-marker.blue { background: #00d4ff; }
+    .goal-marker.red { background: #ff4466; }
+    .goal-marker::after {
+      content: '⚽';
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+    }
+
+    .time-display {
+      font-family: monospace;
+      font-size: 14px;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: #666;
+    }
+    .speed-control select {
+      background: #222;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .full-width { grid-column: 1 / -1; }
+
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .legend-gradient {
+      width: 200px;
+      height: 16px;
+      border-radius: 4px;
+      background: linear-gradient(to right,
+        rgba(0, 0, 0, 0.7),
+        rgba(139, 0, 0, 0.85),
+        rgba(255, 69, 0, 0.9),
+        rgba(255, 165, 0, 0.95),
+        rgba(255, 255, 0, 1),
+        rgba(255, 255, 255, 1)
+      );
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .legend-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <span class="duck">BUMPY</span>
+      <span class="mod">ANALYZER</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 20px;">
+      <div id="matchTitle" style="color: #666;"></div>
+      <button id="loadNewFile" class="heatmap-btn hidden" style="padding: 8px 16px;">Load New File</button>
+    </div>
+  </div>
+
+  <div id="dropZone" class="drop-zone">
+    <h2>Drop Match JSON Here</h2>
+    <p>or click to select file</p>
+    <input type="file" id="fileInput" accept=".json" style="display: none;">
+  </div>
+
+  <div id="dashboard" class="dashboard hidden">
+    <!-- Match Overview -->
+    <div class="card">
+      <div class="card-header">Match Overview</div>
+      <div class="card-content">
+        <div class="match-info" id="matchInfo"></div>
+        <div id="scoreContainer" style="margin-top: 20px;">
+          <div style="font-size: 12px; color: #666; margin-bottom: 5px;">SCORE</div>
+          <div id="scoreDisplay" style="display: flex; align-items: center; justify-content: center; gap: 20px; font-size: 32px; font-weight: bold;">
+            <span style="color: #00d4ff;" id="blueScore">0</span>
+            <span style="color: #666;">-</span>
+            <span style="color: #ff4466;" id="redScore">0</span>
+          </div>
+          <div id="goalsList" style="margin-top: 10px; font-size: 12px;"></div>
+        </div>
+        <div id="possessionContainer" style="margin-top: 20px;">
+          <div style="font-size: 12px; color: #666; margin-bottom: 5px;">POSSESSION</div>
+          <div class="possession-bar" id="possessionBar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="card">
+      <div class="card-header">Position Heatmap</div>
+      <div class="card-content">
+        <div class="heatmap-controls">
+          <button class="heatmap-btn active" id="heatmapPlayers">Players</button>
+          <button class="heatmap-btn" id="heatmapBall">Ball</button>
+        </div>
+        <div class="field-container">
+          <canvas id="heatmapCanvas" width="450" height="650"></canvas>
+        </div>
+        <div class="heatmap-legend">
+          <span class="legend-label">Low</span>
+          <div class="legend-gradient"></div>
+          <span class="legend-label">High</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Player Stats -->
+    <div class="card full-width">
+      <div class="card-header">Player Statistics <span style="font-weight: 300; font-size: 11px; color: #666;">(click players to filter heatmap)</span></div>
+      <div class="card-content">
+        <div style="margin-bottom: 15px;">
+          <button class="heatmap-btn" id="selectAllPlayers" style="margin-right: 5px;">Select All</button>
+          <button class="heatmap-btn" id="deselectAllPlayers">Deselect All</button>
+        </div>
+        <div id="playerStats"></div>
+      </div>
+    </div>
+
+    <!-- Match Replay -->
+    <div class="card full-width">
+      <div class="card-header">Match Replay</div>
+      <div class="card-content">
+        <div class="field-container" style="max-width: 500px;">
+          <canvas id="replayCanvas" width="450" height="650"></canvas>
+        </div>
+        <div id="goalAlert" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 30px 60px; border-radius: 12px; text-align: center; z-index: 1000; border: 2px solid;">
+          <div style="font-size: 48px; font-weight: bold;">GOAL!</div>
+          <div id="goalScorer" style="font-size: 24px; margin-top: 10px;"></div>
+        </div>
+        <div class="replay-controls">
+          <button class="play-btn" id="playBtn">▶</button>
+          <div class="timeline" id="timeline">
+            <div class="timeline-progress" id="timelineProgress"></div>
+            <div class="timeline-thumb" id="timelineThumb"></div>
+            <div id="goalMarkers"></div>
+          </div>
+          <div class="time-display" id="timeDisplay">0:00 / 0:00</div>
+          <div class="speed-control">
+            <span>Speed:</span>
+            <select id="speedSelect">
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+              <option value="4">4x</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Field dimensions (matching the game)
+    const FIELD = {
+      minX: -15, maxX: 30,
+      minZ: -25, maxZ: 40,
+      centerX: 7.5, centerZ: 7.5,
+      goalLeftX: 3.3, goalRightX: 11.7,
+    };
+
+    let matchData = null;
+    let playerAnalysis = {};
+    let heatmapMode = 'players'; // 'players' or 'ball'
+    let selectedPlayers = new Set();
+    let isPlaying = false;
+    let currentSampleIndex = 0;
+    let playbackSpeed = 1;
+    let animationFrame = null;
+    let lastFrameTime = 0;
+
+    // Preload images
+    const pitchImage = new Image();
+    pitchImage.src = 'BumpyPitch.jpg';
+    const blueCarImage = new Image();
+    blueCarImage.src = 'top_blauweauto.png';
+    const redCarImage = new Image();
+    redCarImage.src = 'top_rodeauto.png';
+    let imagesLoaded = 0;
+    const totalImages = 3;
+
+    function onImageLoad() {
+      imagesLoaded++;
+      if (imagesLoaded === totalImages && matchData) {
+        renderHeatmap();
+        renderReplayFrame();
+      }
+    }
+    pitchImage.onload = onImageLoad;
+    blueCarImage.onload = onImageLoad;
+    redCarImage.onload = onImageLoad;
+
+    // File handling
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const dashboard = document.getElementById('dashboard');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) loadFile(e.target.files[0]);
+    });
+
+    document.getElementById('loadNewFile').addEventListener('click', () => {
+      // Stop any playing replay
+      if (isPlaying) togglePlayback();
+      // Reset and show drop zone
+      dropZone.classList.remove('hidden');
+      dropZone.innerHTML = `
+        <h2>Drop Match JSON Here</h2>
+        <p>or click to select file</p>
+        <input type="file" id="fileInput" accept=".json" style="display: none;">
+      `;
+      document.getElementById('fileInput').addEventListener('change', (e) => {
+        if (e.target.files.length) loadFile(e.target.files[0]);
+      });
+      dropZone.onclick = () => document.getElementById('fileInput').click();
+      dashboard.classList.add('hidden');
+      document.getElementById('loadNewFile').classList.add('hidden');
+    });
+
+    function showError(message) {
+      const dropZone = document.getElementById('dropZone');
+      dropZone.classList.remove('hidden');
+      dropZone.innerHTML = `
+        <h2 style="color: #ff4466;">Error Loading File</h2>
+        <p style="color: #ff6680; margin: 10px 0;">${message}</p>
+        <p style="color: #666; margin-top: 20px;">Drop another file or click to try again</p>
+        <input type="file" id="fileInput" accept=".json" style="display: none;">
+      `;
+      document.getElementById('fileInput').addEventListener('change', (e) => {
+        if (e.target.files.length) loadFile(e.target.files[0]);
+      });
+      dashboard.classList.add('hidden');
+    }
+
+    function loadFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          matchData = JSON.parse(e.target.result);
+
+          // Validate required fields
+          if (!matchData.samples) matchData.samples = [];
+          if (!matchData.players) matchData.players = {};
+          if (!matchData.duration) matchData.duration = 0;
+          if (!matchData.recorded) matchData.recorded = new Date().toISOString();
+
+          analyzeMatch();
+          currentSampleIndex = 0;
+          lastGoalIndex = -1;
+          selectedPlayers = new Set(Object.keys(playerAnalysis));
+          showDashboard();
+        } catch (err) {
+          showError('Invalid JSON format: ' + err.message);
+        }
+      };
+      reader.onerror = () => showError('Could not read file');
+      reader.readAsText(file);
+    }
+
+    function analyzeMatch() {
+      playerAnalysis = {};
+      let bluePossession = 0;
+      let redPossession = 0;
+
+      if (!matchData.samples || !Array.isArray(matchData.samples)) {
+        matchData.samples = [];
+      }
+
+      for (const sample of matchData.samples) {
+        if (!sample.players || !Array.isArray(sample.players)) {
+          sample.players = [];
+        }
+        // Possession calculation
+        if (sample.ball && sample.players.length > 0) {
+          let closestBlue = Infinity, closestRed = Infinity;
+          for (const p of sample.players) {
+            if (p.distToBall !== null) {
+              if (p.team === 'blue' && p.distToBall < closestBlue) closestBlue = p.distToBall;
+              if (p.team === 'red' && p.distToBall < closestRed) closestRed = p.distToBall;
+            }
+          }
+          if (closestBlue < closestRed) bluePossession++;
+          else if (closestRed < closestBlue) redPossession++;
+        }
+
+        // Player stats
+        for (const p of sample.players) {
+          if (!playerAnalysis[p.name]) {
+            playerAnalysis[p.name] = {
+              team: p.team,
+              positions: [],
+              speeds: [],
+              distanceSum: 0,
+              lastPos: null,
+              offensiveTime: 0,
+              defensiveTime: 0,
+            };
+          }
+          const pa = playerAnalysis[p.name];
+          pa.positions.push({ x: p.x, z: p.z });
+
+          const speed = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
+          pa.speeds.push(speed);
+
+          if (pa.lastPos) {
+            pa.distanceSum += Math.sqrt((p.x - pa.lastPos.x) ** 2 + (p.z - pa.lastPos.z) ** 2);
+          }
+          pa.lastPos = { x: p.x, z: p.z };
+
+          // Offensive/defensive based on field half
+          // Blue goal is at low Z (bottom), Red goal is at high Z (top)
+          // Blue attacks toward high Z, Red attacks toward low Z
+          const midZ = FIELD.centerZ;
+          if (p.team === 'blue') {
+            if (p.z > midZ) pa.offensiveTime++;  // Blue in red's half = offensive
+            else pa.defensiveTime++;
+          } else {
+            if (p.z < midZ) pa.offensiveTime++;  // Red in blue's half = offensive
+            else pa.defensiveTime++;
+          }
+        }
+      }
+
+      // Store possession
+      const totalPossession = bluePossession + redPossession;
+      matchData.possession = {
+        blue: totalPossession > 0 ? (bluePossession / totalPossession * 100) : 50,
+        red: totalPossession > 0 ? (redPossession / totalPossession * 100) : 50,
+      };
+    }
+
+    function showDashboard() {
+      dropZone.classList.add('hidden');
+      dashboard.classList.remove('hidden');
+      document.getElementById('loadNewFile').classList.remove('hidden');
+
+      // Match title
+      document.getElementById('matchTitle').textContent =
+        `Recorded: ${new Date(matchData.recorded).toLocaleString()}`;
+
+      // Match info
+      const duration = Math.floor(matchData.duration / 1000);
+      const mins = Math.floor(duration / 60);
+      const secs = duration % 60;
+      const playerCount = Object.keys(matchData.players).length;
+      const sampleCount = matchData.samples.length;
+
+      document.getElementById('matchInfo').innerHTML = `
+        <div class="stat">
+          <div class="stat-value">${mins}:${secs.toString().padStart(2, '0')}</div>
+          <div class="stat-label">Duration</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">${playerCount}</div>
+          <div class="stat-label">Players</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">${sampleCount}</div>
+          <div class="stat-label">Samples</div>
+        </div>
+      `;
+
+      // Score and goals
+      const goals = matchData.goals || [];
+      const blueGoals = goals.filter(g => g.team === 'blue');
+      const redGoals = goals.filter(g => g.team === 'red');
+      document.getElementById('blueScore').textContent = blueGoals.length;
+      document.getElementById('redScore').textContent = redGoals.length;
+
+      if (goals.length > 0) {
+        const formatGoalTime = (ms) => {
+          const secs = Math.floor(ms / 1000);
+          const mins = Math.floor(secs / 60);
+          return `${mins}:${(secs % 60).toString().padStart(2, '0')}`;
+        };
+        const goalsHtml = goals
+          .sort((a, b) => a.t - b.t)
+          .map(g => `<div style="color: ${g.team === 'blue' ? '#00d4ff' : '#ff4466'};">${formatGoalTime(g.t)} - ${g.scorer}</div>`)
+          .join('');
+        document.getElementById('goalsList').innerHTML = goalsHtml;
+      }
+
+      // Possession bar
+      document.getElementById('possessionBar').innerHTML = `
+        <div class="blue" style="width: ${matchData.possession.blue}%">${matchData.possession.blue.toFixed(0)}%</div>
+        <div class="red" style="width: ${matchData.possession.red}%">${matchData.possession.red.toFixed(0)}%</div>
+      `;
+
+      // Player stats
+      renderPlayerStats();
+
+      // Initial renders
+      renderHeatmap();
+      renderReplayFrame();
+      renderGoalMarkers();
+      updateTimeDisplay();
+
+      // Setup controls
+      setupHeatmapControls();
+      setupReplayControls();
+    }
+
+    function renderGoalMarkers() {
+      const container = document.getElementById('goalMarkers');
+      if (!matchData.goals || matchData.goals.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const totalDuration = matchData.duration;
+      let html = '';
+
+      for (const goal of matchData.goals) {
+        const pct = (goal.t / totalDuration) * 100;
+        html += `<div class="goal-marker ${goal.team}" style="left: ${pct}%;" title="${goal.scorer}"></div>`;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function renderPlayerStats() {
+      const container = document.getElementById('playerStats');
+
+      // Group players by team
+      const bluePlayers = [];
+      const redPlayers = [];
+
+      for (const [name, data] of Object.entries(playerAnalysis)) {
+        const playerData = { name, ...data };
+        if (data.team === 'blue') {
+          bluePlayers.push(playerData);
+        } else {
+          redPlayers.push(playerData);
+        }
+      }
+
+      function renderPlayerCard(player) {
+        const avgSpeed = player.speeds.length > 0
+          ? (player.speeds.reduce((a, b) => a + b, 0) / player.speeds.length).toFixed(2)
+          : 0;
+        const maxSpeed = player.speeds.length > 0
+          ? player.speeds.reduce((a, b) => Math.max(a, b), 0).toFixed(2)
+          : 0;
+        const distance = player.distanceSum.toFixed(1);
+        const avgX = player.positions.length > 0
+          ? player.positions.reduce((a, p) => a + p.x, 0) / player.positions.length
+          : 0;
+        const avgZ = player.positions.length > 0
+          ? player.positions.reduce((a, p) => a + p.z, 0) / player.positions.length
+          : 0;
+        const totalTime = player.offensiveTime + player.defensiveTime;
+        const offensivePct = totalTime > 0 ? (player.offensiveTime / totalTime * 100).toFixed(0) : 50;
+        const isSelected = selectedPlayers.has(player.name);
+
+        return `
+          <div class="player-card ${player.team} ${isSelected ? 'selected' : ''}" data-player="${player.name}">
+            <div class="player-name">${player.name}</div>
+            <div class="player-stat-row"><span>Distance traveled</span><span>${distance} units</span></div>
+            <div class="player-stat-row"><span>Avg speed</span><span>${avgSpeed}</span></div>
+            <div class="player-stat-row"><span>Max speed</span><span>${maxSpeed}</span></div>
+            <div class="player-stat-row"><span>Offensive time</span><span>${offensivePct}%</span></div>
+            <div class="player-stat-row"><span>Avg position</span><span>${avgX.toFixed(1)}, ${avgZ.toFixed(1)}</span></div>
+          </div>
+        `;
+      }
+
+      let html = '';
+
+      if (bluePlayers.length > 0) {
+        const blueSelected = bluePlayers.filter(p => selectedPlayers.has(p.name)).length;
+        html += `<div class="team-section">
+          <div class="team-header blue" data-team="blue">Blue Team (${blueSelected}/${bluePlayers.length})</div>
+          <div class="player-stats">${bluePlayers.map(renderPlayerCard).join('')}</div>
+        </div>`;
+      }
+
+      if (redPlayers.length > 0) {
+        const redSelected = redPlayers.filter(p => selectedPlayers.has(p.name)).length;
+        html += `<div class="team-section">
+          <div class="team-header red" data-team="red">Red Team (${redSelected}/${redPlayers.length})</div>
+          <div class="player-stats">${redPlayers.map(renderPlayerCard).join('')}</div>
+        </div>`;
+      }
+
+      container.innerHTML = html;
+
+      // Add click handlers for player cards
+      container.querySelectorAll('.player-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const playerName = card.dataset.player;
+          if (selectedPlayers.has(playerName)) {
+            selectedPlayers.delete(playerName);
+            card.classList.remove('selected');
+          } else {
+            selectedPlayers.add(playerName);
+            card.classList.add('selected');
+          }
+          // Update team header counts
+          renderPlayerStats();
+          renderHeatmap();
+        });
+      });
+
+      // Add click handlers for team headers (toggle all players on that team)
+      container.querySelectorAll('.team-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const team = header.dataset.team;
+          const teamPlayers = Object.entries(playerAnalysis)
+            .filter(([_, data]) => data.team === team)
+            .map(([name, _]) => name);
+
+          // Check if all team players are selected
+          const allSelected = teamPlayers.every(name => selectedPlayers.has(name));
+
+          if (allSelected) {
+            // Deselect all team players
+            teamPlayers.forEach(name => selectedPlayers.delete(name));
+          } else {
+            // Select all team players
+            teamPlayers.forEach(name => selectedPlayers.add(name));
+          }
+
+          renderPlayerStats();
+          renderHeatmap();
+        });
+      });
+
+      // Setup select/deselect all buttons
+      document.getElementById('selectAllPlayers').addEventListener('click', () => {
+        Object.keys(playerAnalysis).forEach(name => selectedPlayers.add(name));
+        renderPlayerStats();
+        renderHeatmap();
+      });
+
+      document.getElementById('deselectAllPlayers').addEventListener('click', () => {
+        selectedPlayers.clear();
+        renderPlayerStats();
+        renderHeatmap();
+      });
+    }
+
+    function renderHeatmap() {
+      const canvas = document.getElementById('heatmapCanvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+
+      // Clear
+      ctx.fillStyle = '#0a0a12';
+      ctx.fillRect(0, 0, w, h);
+
+      // Draw pitch image as background (flipped vertically to match coordinate system)
+      if (pitchImage.complete && pitchImage.naturalWidth > 0) {
+        ctx.save();
+        ctx.translate(0, h);
+        ctx.scale(1, -1);
+        ctx.drawImage(pitchImage, 0, 0, w, h);
+        ctx.restore();
+      } else {
+        // Fallback to drawn field if image not loaded
+        drawField(ctx, w, h);
+      }
+
+      // Collect positions based on mode
+      let positions = [];
+
+      if (heatmapMode === 'ball') {
+        for (const sample of matchData.samples) {
+          if (sample.ball) positions.push({ x: sample.ball.x, z: sample.ball.z });
+        }
+      } else {
+        // Filter by selected players only
+        for (const [name, data] of Object.entries(playerAnalysis)) {
+          if (selectedPlayers.has(name)) {
+            positions.push(...data.positions);
+          }
+        }
+      }
+
+      // Create heatmap grid (higher = smoother)
+      const gridSize = 20;
+      const grid = {};
+      let maxCount = 0;
+
+      for (const pos of positions) {
+        const gx = Math.floor((pos.x - FIELD.minX) / (FIELD.maxX - FIELD.minX) * gridSize);
+        const gz = Math.floor((pos.z - FIELD.minZ) / (FIELD.maxZ - FIELD.minZ) * gridSize);
+        const key = `${gx},${gz}`;
+        grid[key] = (grid[key] || 0) + 1;
+        maxCount = Math.max(maxCount, grid[key]);
+      }
+
+      // Draw heatmap - no padding since pitch image fills canvas
+      const cellW = w / gridSize;
+      const cellH = h / gridSize;
+
+      if (maxCount === 0) return; // No data to draw
+
+      // Thermal heat gradient: black -> dark red -> orange -> yellow -> white
+      function getHeatColor(intensity) {
+        let r, g, b;
+        if (intensity < 0.2) {
+          // Black to dark red
+          const t = intensity / 0.2;
+          r = Math.round(139 * t);         // 0 -> 139
+          g = 0;
+          b = 0;
+        } else if (intensity < 0.4) {
+          // Dark red to orange-red
+          const t = (intensity - 0.2) / 0.2;
+          r = Math.round(139 + 116 * t);   // 139 -> 255
+          g = Math.round(69 * t);          // 0 -> 69
+          b = 0;
+        } else if (intensity < 0.6) {
+          // Orange-red to orange
+          const t = (intensity - 0.4) / 0.2;
+          r = 255;
+          g = Math.round(69 + 96 * t);     // 69 -> 165
+          b = 0;
+        } else if (intensity < 0.8) {
+          // Orange to yellow
+          const t = (intensity - 0.6) / 0.2;
+          r = 255;
+          g = Math.round(165 + 90 * t);    // 165 -> 255
+          b = 0;
+        } else {
+          // Yellow to white
+          const t = (intensity - 0.8) / 0.2;
+          r = 255;
+          g = 255;
+          b = Math.round(255 * t);         // 0 -> 255
+        }
+        return { r, g, b };
+      }
+
+      for (const [key, count] of Object.entries(grid)) {
+        const [gx, gz] = key.split(',').map(Number);
+        const intensity = count / maxCount;
+        const { r, g, b } = getHeatColor(intensity);
+
+        // Higher base alpha for better visibility, scales with intensity
+        const alpha = 0.5 + intensity * 0.45;
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        ctx.fillRect(
+          gx * cellW,
+          (gridSize - 1 - gz) * cellH,
+          cellW,
+          cellH
+        );
+      }
+    }
+
+    function drawField(ctx, w, h) {
+      const pad = 20;
+      const fieldW = w - pad * 2;
+      const fieldH = h - pad * 2;
+
+      // Field background
+      ctx.fillStyle = '#1e4d2b';
+      ctx.fillRect(pad, pad, fieldW, fieldH);
+
+      // Field outline
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(pad, pad, fieldW, fieldH);
+
+      // Center line
+      ctx.beginPath();
+      ctx.moveTo(pad, pad + fieldH / 2);
+      ctx.lineTo(pad + fieldW, pad + fieldH / 2);
+      ctx.stroke();
+
+      // Center circle
+      ctx.beginPath();
+      ctx.arc(pad + fieldW / 2, pad + fieldH / 2, 30, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Goals
+      const goalW = fieldW * 0.3;
+      const goalX = pad + (fieldW - goalW) / 2;
+
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(goalX, pad + fieldH);
+      ctx.lineTo(goalX + goalW, pad + fieldH);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ff4466';
+      ctx.beginPath();
+      ctx.moveTo(goalX, pad);
+      ctx.lineTo(goalX + goalW, pad);
+      ctx.stroke();
+    }
+
+    function setupHeatmapControls() {
+      const playersBtn = document.getElementById('heatmapPlayers');
+      const ballBtn = document.getElementById('heatmapBall');
+
+      playersBtn.addEventListener('click', () => {
+        playersBtn.classList.add('active');
+        ballBtn.classList.remove('active');
+        heatmapMode = 'players';
+        renderHeatmap();
+      });
+
+      ballBtn.addEventListener('click', () => {
+        ballBtn.classList.add('active');
+        playersBtn.classList.remove('active');
+        heatmapMode = 'ball';
+        renderHeatmap();
+      });
+    }
+
+    let lastGoalIndex = -1;
+
+    function renderReplayFrame() {
+      const canvas = document.getElementById('replayCanvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+
+      // Clear and draw pitch image
+      ctx.fillStyle = '#0a0a12';
+      ctx.fillRect(0, 0, w, h);
+
+      // Draw pitch image (flipped vertically to match coordinate system)
+      if (pitchImage.complete && pitchImage.naturalWidth > 0) {
+        ctx.save();
+        ctx.translate(0, h);
+        ctx.scale(1, -1);
+        ctx.drawImage(pitchImage, 0, 0, w, h);
+        ctx.restore();
+      } else {
+        drawFieldWithCorners(ctx, w, h);
+      }
+
+      if (!matchData || currentSampleIndex >= matchData.samples.length) return;
+
+      const sample = matchData.samples[currentSampleIndex];
+
+      // No padding - pitch image fills canvas
+      const scaleX = x => ((x - FIELD.minX) / (FIELD.maxX - FIELD.minX)) * w;
+      const scaleZ = z => h - ((z - FIELD.minZ) / (FIELD.maxZ - FIELD.minZ)) * h;
+
+      // Check for goals
+      checkForGoal(sample.t);
+
+      // Draw ball
+      if (sample.ball) {
+        const bx = scaleX(sample.ball.x);
+        const bz = scaleZ(sample.ball.z);
+
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(bx, bz, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Draw players using car images
+      if (!sample.players) return;
+      const carWidth = 24;
+      const carHeight = 40;
+
+      for (const p of sample.players) {
+        const px = scaleX(p.x);
+        const pz = scaleZ(p.z);
+        const carImage = p.team === 'blue' ? blueCarImage : redCarImage;
+
+        // Calculate rotation from velocity (add PI to flip 180 degrees)
+        let rotation = 0;
+        if (p.vx !== 0 || p.vz !== 0) {
+          rotation = Math.atan2(-p.vx, -p.vz) + Math.PI;
+        }
+
+        ctx.save();
+        ctx.translate(px, pz);
+        ctx.rotate(rotation);
+
+        // Draw car image if loaded, fallback to circle
+        if (carImage.complete && carImage.naturalWidth > 0) {
+          ctx.drawImage(carImage, -carWidth / 2, -carHeight / 2, carWidth, carHeight);
+        } else {
+          // Fallback to colored circle
+          const color = p.team === 'blue' ? '#00d4ff' : '#ff4466';
+          ctx.beginPath();
+          ctx.arc(0, 0, 10, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+
+        ctx.restore();
+
+        // Name (drawn without rotation)
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#000';
+        ctx.shadowBlur = 3;
+        ctx.fillText(p.name.slice(0, 6), px, pz - 25);
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    function drawFieldWithCorners(ctx, w, h) {
+      const pad = 20;
+      const fieldW = w - pad * 2;
+      const fieldH = h - pad * 2;
+      const corner = 30; // 45-degree corner size
+
+      // Field background with cut corners
+      ctx.fillStyle = '#1e4d2b';
+      ctx.beginPath();
+      ctx.moveTo(pad + corner, pad);
+      ctx.lineTo(pad + fieldW - corner, pad);
+      ctx.lineTo(pad + fieldW, pad + corner);
+      ctx.lineTo(pad + fieldW, pad + fieldH - corner);
+      ctx.lineTo(pad + fieldW - corner, pad + fieldH);
+      ctx.lineTo(pad + corner, pad + fieldH);
+      ctx.lineTo(pad, pad + fieldH - corner);
+      ctx.lineTo(pad, pad + corner);
+      ctx.closePath();
+      ctx.fill();
+
+      // Field outline
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Center line
+      ctx.beginPath();
+      ctx.moveTo(pad, pad + fieldH / 2);
+      ctx.lineTo(pad + fieldW, pad + fieldH / 2);
+      ctx.stroke();
+
+      // Center circle
+      ctx.beginPath();
+      ctx.arc(pad + fieldW / 2, pad + fieldH / 2, 30, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Goals
+      const goalW = fieldW * 0.3;
+      const goalX = pad + (fieldW - goalW) / 2;
+
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(goalX, pad + fieldH);
+      ctx.lineTo(goalX + goalW, pad + fieldH);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ff4466';
+      ctx.beginPath();
+      ctx.moveTo(goalX, pad);
+      ctx.lineTo(goalX + goalW, pad);
+      ctx.stroke();
+    }
+
+    function checkForGoal(currentTime) {
+      if (!matchData.goals || matchData.goals.length === 0) return;
+
+      for (let i = 0; i < matchData.goals.length; i++) {
+        const goal = matchData.goals[i];
+        // Show goal if we're within 500ms after the goal time
+        if (currentTime >= goal.t && currentTime <= goal.t + 2000 && lastGoalIndex !== i) {
+          lastGoalIndex = i;
+          showGoalAlert(goal);
+          break;
+        }
+      }
+    }
+
+    function showGoalAlert(goal) {
+      const alert = document.getElementById('goalAlert');
+      const scorer = document.getElementById('goalScorer');
+      const color = goal.team === 'blue' ? '#00d4ff' : '#ff4466';
+
+      alert.style.borderColor = color;
+      alert.style.color = color;
+      scorer.textContent = goal.scorer;
+
+      alert.style.display = 'block';
+
+      setTimeout(() => {
+        alert.style.display = 'none';
+      }, 2000);
+    }
+
+    function setupReplayControls() {
+      const playBtn = document.getElementById('playBtn');
+      const timeline = document.getElementById('timeline');
+      const speedSelect = document.getElementById('speedSelect');
+
+      playBtn.addEventListener('click', togglePlayback);
+
+      timeline.addEventListener('click', (e) => {
+        const rect = timeline.getBoundingClientRect();
+        const pct = (e.clientX - rect.left) / rect.width;
+        currentSampleIndex = Math.min(
+          Math.floor(pct * matchData.samples.length),
+          matchData.samples.length - 1
+        );
+        if (currentSampleIndex < 0) currentSampleIndex = 0;
+        // Reset goal tracking based on new position
+        lastGoalIndex = -1;
+        if (matchData.goals) {
+          const currentTime = matchData.samples[currentSampleIndex]?.t || 0;
+          for (let i = matchData.goals.length - 1; i >= 0; i--) {
+            if (matchData.goals[i].t < currentTime) {
+              lastGoalIndex = i;
+              break;
+            }
+          }
+        }
+        renderReplayFrame();
+        updateTimeDisplay();
+      });
+
+      speedSelect.addEventListener('change', (e) => {
+        playbackSpeed = parseFloat(e.target.value);
+      });
+    }
+
+    function togglePlayback() {
+      isPlaying = !isPlaying;
+      document.getElementById('playBtn').textContent = isPlaying ? '⏸' : '▶';
+
+      if (isPlaying) {
+        lastFrameTime = performance.now();
+        animate();
+      } else if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+    }
+
+    function animate() {
+      if (!isPlaying) return;
+
+      const now = performance.now();
+      const elapsed = now - lastFrameTime;
+
+      // Each sample is 200ms, adjust for playback speed
+      const samplesPerMs = playbackSpeed / 200;
+      const samplesToAdvance = elapsed * samplesPerMs;
+
+      if (samplesToAdvance >= 1) {
+        currentSampleIndex = Math.min(
+          currentSampleIndex + Math.floor(samplesToAdvance),
+          matchData.samples.length - 1
+        );
+        lastFrameTime = now;
+        renderReplayFrame();
+        updateTimeDisplay();
+
+        if (currentSampleIndex >= matchData.samples.length - 1) {
+          isPlaying = false;
+          document.getElementById('playBtn').textContent = '▶';
+          return;
+        }
+      }
+
+      animationFrame = requestAnimationFrame(animate);
+    }
+
+    function updateTimeDisplay() {
+      if (!matchData || !matchData.samples || matchData.samples.length === 0) return;
+
+      const currentTime = matchData.samples[currentSampleIndex]?.t || 0;
+      const totalTime = matchData.duration;
+
+      const formatTime = (ms) => {
+        const secs = Math.floor(ms / 1000);
+        const mins = Math.floor(secs / 60);
+        return `${mins}:${(secs % 60).toString().padStart(2, '0')}`;
+      };
+
+      document.getElementById('timeDisplay').textContent =
+        `${formatTime(currentTime)} / ${formatTime(totalTime)}`;
+
+      const pct = matchData.samples.length > 1
+        ? (currentSampleIndex / (matchData.samples.length - 1)) * 100
+        : 0;
+      document.getElementById('timelineProgress').style.width = `${pct}%`;
+      document.getElementById('timelineThumb').style.left = `${pct}%`;
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (!matchData) return;
+
+      switch(e.code) {
+        case 'Space':
+          e.preventDefault();
+          togglePlayback();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          currentSampleIndex = Math.max(0, currentSampleIndex - 10);
+          renderReplayFrame();
+          updateTimeDisplay();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          currentSampleIndex = Math.min(matchData.samples.length - 1, currentSampleIndex + 10);
+          renderReplayFrame();
+          updateTimeDisplay();
+          break;
+      }
+    });
+  </script>
+</body>
+</html>
